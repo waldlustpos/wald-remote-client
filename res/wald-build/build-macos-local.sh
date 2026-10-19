@@ -23,7 +23,10 @@
 #          ref 는 waldlustpos(origin)에 푸시된 wald-v* 태그만 받는다(재현성 — 소스 링크가 이 태그를 가리킨다).
 #          태그 wald-v<버전>-r<N> 의 버전이 소스(pubspec·Cargo.toml) 버전과 달라도 멈춘다(D36).
 #          서명 전에 NOTICE·LICENCE·THIRD_PARTY_NOTICES-macos.txt(res/wald-build/collect-notices.py)를 앱 Resources 에 넣고
-#          dist 에도 둔다. 번들 ID co.kr.waldlust.remote·URL 스킴 waldlust 를 확인한다. 서명은 여전히 ad-hoc(공증 없음 — D34).
+#          dist 에도 둔다. 번들 ID co.kr.waldlust.remote·URL 스킴 waldlust 를 확인한다.
+#          서명은 Developer ID + 공증(2026-10-16 사용자 — 명세 Q-42, D34 의 ad-hoc 을 바꿈): 번들 안쪽 코드부터 하드닝 런타임·타임스탬프로
+#          서명하고(실행 파일에는 Release.entitlements), 앱과 dmg 를 각각 공증·스테이플한다. 서명 주체 WALD_MAC_SIGN_ID(기본 회사
+#          Developer ID Application), 공증 keychain 프로필 WALD_NOTARY_PROFILE(기본 wald-notary). 시험본(dummy·mock·prodtest)은 ad-hoc 그대로.
 #          cargo-about 0.6.4(cargo install cargo-about --version 0.6.4 --locked)가 있어야 한다.
 # - 공용 작업 폴더는 건드리지 않는다. 별도 git worktree 에서 빌드하고 cargo target(~/wald-build/target-macos)을 분리한다.
 #   vcpkg 루트는 ~/vcpkg(arm64-osx 전용)다. Android 빌드는 ~/vcpkg-android 를 쓴다(같은 루트에 다른 트리플렛을 설치하면 기존 설치분이 purge 된다).
@@ -52,6 +55,9 @@ PROD=""; { [ "$TARGET" = prodtest ] || [ "$TARGET" = release ]; } && PROD=1   # 
 TSUF="-$TARGET"; [ "$TARGET" = release ] && TSUF=""   # dist 설치 파일 이름 끝(D36 — 정식본은 대상 이름 없음)
 FLUTTER_BIN="$HOME/fvm/versions/3.24.5/bin"
 MIN_MACOS_VERSION=12.3
+SIGN_ID="${WALD_MAC_SIGN_ID:-Developer ID Application: Waldlust Co., Ltd. (GFY79GHBW8)}"   # release 만
+NOTARY_PROFILE="${WALD_NOTARY_PROFILE:-wald-notary}"
+SIG_NOTE="ad-hoc (not notarized)"; [ "$TARGET" = release ] && SIG_NOTE="Developer ID (notarized)"   # manifest — 어드민 카탈로그 publish.signature 와 같게
 
 export PATH="$FLUTTER_BIN:$HOME/.cargo/bin:$PATH"
 export VCPKG_ROOT="$HOME/vcpkg"
@@ -68,6 +74,16 @@ unset WALDLUST_PRESET_PASSWORD WALDLUST_VARIANT
 
 step() { echo "== $1 $(date +%T)"; }
 die() { echo "FAIL: $1 (로그: $LOG)"; exit 1; }
+# 공증: 제출하고 끝날 때까지 기다린 뒤 결과·Apple 로그를 $LOG/macos-notary-<이름>*.json 에 남긴다. Accepted 가 아니면 멈춘다.
+notarize() {
+  local out="$LOG/macos-notary-$2.json" st id
+  xcrun notarytool submit "$1" --keychain-profile "$NOTARY_PROFILE" --wait --timeout 1h --output-format json > "$out" 2>> "$LOG/macos-notary.log"
+  st=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("status",""))' "$out" 2>/dev/null)
+  id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id",""))' "$out" 2>/dev/null)
+  [ -n "$id" ] && xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE" "$LOG/macos-notary-$2-log.json" >> "$LOG/macos-notary.log" 2>&1
+  [ "$st" = Accepted ] || die "공증 실패($2: ${st:-응답 없음}) — $LOG/macos-notary-$2-log.json"
+  echo "notarized $2: $id"
+}
 
 xcodebuild -version >/dev/null 2>&1 || die "Xcode 가 선택되지 않았거나 라이선스 미동의(sudo xcode-select -s …, sudo xcodebuild -license accept)"
 
@@ -79,6 +95,9 @@ if [ "$TARGET" = release ]; then
   lc=$(git -C "$R" rev-parse -q --verify "$BASE^{commit}")
   [ -n "$rc" ] && [ "$rc" = "$lc" ] || die "태그 $BASE 가 origin 에 없거나 로컬과 다르다(origin ${rc:-없음}, 로컬 ${lc:-없음})"
   [ -x "$HOME/.cargo/bin/cargo-about" ] || die "cargo-about 이 없다(cargo install cargo-about --version 0.6.4 --locked)"
+  security find-identity -v -p codesigning | grep -qF "\"$SIGN_ID\"" || die "서명 인증서가 keychain 에 없다: $SIGN_ID"
+  xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 ||
+    die "공증 프로필 $NOTARY_PROFILE 이 없거나 동작하지 않는다(xcrun notarytool store-credentials)"
 fi
 
 # 0) worktree 를 새로 만든다(공용 작업 폴더와 분리). target 은 worktree 밖에 두고 심볼릭 링크한다.
@@ -143,10 +162,34 @@ if [ "$TARGET" = release ]; then
     cp "$NOTICES" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.txt" || die "고지 파일 복사"
 fi
 
-# 4) ad-hoc 재서명: build.py 가 flutter 서명 뒤에 service 를 복사해 번들 서명이 깨진다(CI 와 같은 처리).
+# 4) 재서명: build.py 가 flutter 서명 뒤에 service 를 복사해 번들 서명이 깨진다(CI 와 같은 처리).
+#    시험본은 ad-hoc. release 는 Developer ID — --deep 대신 안쪽(프레임워크·dylib → 보조 실행 파일 → 앱)부터 서명한다
+#    (--force 재서명은 엔타이틀먼트를 버리므로 실행 파일에 Release.entitlements 를 다시 준다). 그다음 앱을 공증·스테이플한다.
 step sign
-codesign --force --deep --sign - "$APP" > "$LOG/macos-sign.log" 2>&1 || die sign
-codesign --verify --deep --strict "$APP" >> "$LOG/macos-sign.log" 2>&1 || die "서명 검증"
+if [ "$TARGET" = release ]; then
+  ENT=flutter/macos/Runner/Release.entitlements
+  CS=(codesign --force --options runtime --timestamp --sign "$SIGN_ID")
+  MAIN_EXE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")
+  : > "$LOG/macos-sign.log"
+  for f in "$APP"/Contents/Frameworks/*.framework(N) "$APP"/Contents/Frameworks/*.dylib(N); do
+    "${CS[@]}" "$f" >> "$LOG/macos-sign.log" 2>&1 || die "서명 ${f:t}"
+  done
+  for f in "$APP"/Contents/MacOS/*(N); do
+    [ "${f:t}" = "$MAIN_EXE" ] && continue
+    "${CS[@]}" --entitlements "$ENT" "$f" >> "$LOG/macos-sign.log" 2>&1 || die "서명 ${f:t}"
+  done
+  "${CS[@]}" --entitlements "$ENT" "$APP" >> "$LOG/macos-sign.log" 2>&1 || die "서명 앱"
+  codesign --verify --deep --strict "$APP" >> "$LOG/macos-sign.log" 2>&1 || die "서명 검증"
+  step notarize-app
+  ZIP="$OUT/notary-app-macos.zip"; rm -f "$ZIP"
+  ditto -c -k --keepParent "$APP" "$ZIP" || die "공증용 zip"
+  notarize "$ZIP" app
+  rm -f "$ZIP"
+  xcrun stapler staple "$APP" >> "$LOG/macos-notary.log" 2>&1 || die "앱 스테이플"
+else
+  codesign --force --deep --sign - "$APP" > "$LOG/macos-sign.log" 2>&1 || die sign
+  codesign --verify --deep --strict "$APP" >> "$LOG/macos-sign.log" 2>&1 || die "서명 검증"
+fi
 VER=$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
 DEST="$OUT/waldlust-$VER-macos-$KIND$SUFFIX.app"
 pgrep -f "$DEST/Contents/MacOS/" >/dev/null && die "$DEST 가 실행 중이다 — 종료한 뒤 다시 돌린다"
@@ -198,7 +241,20 @@ if ! create-dmg "${DMG_ARGS[@]}" "$DMG" "$STAGE" > "$LOG/macos-dmg.log" 2>&1; th
   DMG_NOTE=" (Finder 창 배치 생략 — --skip-jenkins)"
 fi
 rm -rf "$STAGE"
+if [ "$TARGET" = release ]; then
+  codesign --force --timestamp --sign "$SIGN_ID" "$DMG" >> "$LOG/macos-dmg.log" 2>&1 || die "dmg 서명"
+  step notarize-dmg
+  notarize "$DMG" dmg
+  xcrun stapler staple "$DMG" >> "$LOG/macos-notary.log" 2>&1 || die "dmg 스테이플"
+fi
 hdiutil verify "$DMG" >> "$LOG/macos-dmg.log" 2>&1 || die "dmg 검증"
+if [ "$TARGET" = release ]; then
+  # Gatekeeper 판정: 앱은 'Notarized Developer ID', dmg 는 열기 허용이어야 한다.
+  spctl -a -t exec -vv "$DEST" > "$LOG/macos-gatekeeper.log" 2>&1 && grep -q 'Notarized Developer ID' "$LOG/macos-gatekeeper.log" || die "앱 Gatekeeper 판정"
+  spctl -a -t open --context context:primary-signature -vv "$DMG" >> "$LOG/macos-gatekeeper.log" 2>&1 || die "dmg Gatekeeper 판정"
+  xcrun stapler validate "$DMG" >> "$LOG/macos-gatekeeper.log" 2>&1 || die "dmg 스테이플 확인"
+  cat "$LOG/macos-gatekeeper.log"
+fi
 {
   echo "ref: $BASE ($COMMIT)"
   echo "platform: macos-aarch64"
@@ -208,7 +264,7 @@ hdiutil verify "$DMG" >> "$LOG/macos-dmg.log" 2>&1 || die "dmg 검증"
   echo "heartbeat: $WALDLUST_HEARTBEAT_URL"
   echo "check: $CHECK"
   echo "bundle id: $BUNDLE_ID / url scheme: $SCHEMES"
-  echo "signature: ad-hoc (not notarized)"
+  echo "signature: $SIG_NOTE"
   echo "dmg: ${DMG:t}$DMG_NOTE"
   echo "size: $(stat -f %z "$DMG")"
   echo "sha256: $(shasum -a 256 "$DMG" | awk '{print $1}')"
@@ -218,4 +274,8 @@ if [ "$TARGET" = release ]; then
   cp NOTICE "$DIST/NOTICE.txt" && cp LICENCE "$DIST/LICENCE.txt" && cp "$NOTICES" "$DIST/THIRD_PARTY_NOTICES-macos.txt" || die "dist 고지 복사"
 fi
 echo "dmg: $DMG$DMG_NOTE"
-echo "첫 실행: 미서명(ad-hoc) 앱이라 막히면 시스템 설정 > 개인정보 보호 및 보안 > '그래도 열기'. 화면 기록·손쉬운 사용 권한은 시스템 설정에서 허용."
+if [ "$TARGET" = release ]; then
+  echo "첫 실행: Developer ID 서명·공증본이라 Gatekeeper 경고 없이 열린다. 화면 기록·손쉬운 사용 권한은 시스템 설정에서 허용(서명 주체가 같으면 업데이트 뒤에도 유지)."
+else
+  echo "첫 실행: 미서명(ad-hoc) 앱이라 막히면 시스템 설정 > 개인정보 보호 및 보안 > '그래도 열기'. 화면 기록·손쉬운 사용 권한은 시스템 설정에서 허용."
+fi
