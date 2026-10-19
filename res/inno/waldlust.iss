@@ -3,7 +3,7 @@
 ; 설계 의도(중요):
 ;  - 자기추출 packer/requireAdministrator/자동 silent-install 을 버리고, "흔한 Inno 인스톨러"
 ;    한 개로 배포한다. Defender ML 이 가장 덜 의심하는 형태.
-;  - 이 인스톨러는 파일 복사 + 제어판 등록 + 시작메뉴만 담당한다.
+;  - 이 인스톨러는 파일 복사 + 제어판 등록 + 시작메뉴만 담당한다. 덮어 설치 때는 복사 전에 실행 중인 앱을 끈다([Code], 부록 A-40).
 ;  - 서비스 등록/방화벽/URL 프로토콜 같은 RustDesk 고유 작업은 앱 본체의
 ;    "Waldlust.exe --after-install" 을 호출해서 위임한다(설치 시 메인 exe 를 Waldlust.exe 로 넣음).
 ;  - 설치 경로는 반드시 {autopf}\Waldlust Remote 로 고정한다. RustDesk 의 --after-install /
@@ -109,11 +109,61 @@ Filename: "{sys}\sc.exe"; Parameters: "failure Waldlust reset= 86400 actions= re
   Flags: runhidden waituntilterminated
 Filename: "{sys}\sc.exe"; Parameters: "start Waldlust"; \
   StatusMsg: "서비스 시작 중..."; Flags: runhidden waituntilterminated
-; 설치 완료 후 앱을 바로 띄우고 싶으면 아래 주석 해제(선택):
-; Filename: "{app}\Waldlust.exe"; Description: "Waldlust 원격지원 실행"; \
-;   Flags: nowait postinstall skipifsilent
+; Waldlust(부록 A-40): 덮어 설치로 끈 트레이를 로그인 사용자 권한으로 다시 띄운다(이미 떠 있으면 --tray 가 스스로 끝난다).
+Filename: "{app}\Waldlust.exe"; Parameters: "--tray"; Flags: nowait runasoriginaluser skipifsilent
+; Waldlust(부록 A-40): 설치 완료 화면의 '실행' 체크박스(기본 켬). postinstall 은 로그인 사용자 권한으로 실행된다(관리자 창 방지).
+Filename: "{app}\Waldlust.exe"; Description: "{cm:LaunchProgram,Waldlust 원격지원}"; \
+  Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; 제거 시: 서비스 중지·삭제 + 방화벽 규칙 삭제 + 레지스트리 정리.
 Filename: "{app}\Waldlust.exe"; Parameters: "--before-uninstall"; \
   Flags: runhidden waituntilterminated; RunOnceId: "WaldlustBeforeUninstall"
+
+[Code]
+// Waldlust(부록 A-40): 덮어 설치(업데이트) 때 실행 중인 서비스·서버·트레이·메인 창·CM 을 파일 복사 전에 끈다.
+//  - 서비스를 먼저 멈춘다. 서비스는 --server 를 다시 띄우고, 서비스 프로세스가 죽으면 sc failure 복구가 5초 뒤
+//    옛 exe 를 다시 띄운다 → 복구 동작을 잠시 끄고([Run] 이 다시 넣는다) net stop 으로 멈출 때까지 기다린 뒤 남은 프로세스를 끝낸다.
+//  - 새 설치(서비스 없음)면 sc query 가 1060 이라 서비스는 건드리지 않는다. taskkill 결과는 보지 않는다.
+//  - 파일 설치 전에 취소·실패하면 DeinitializeSetup 이 복구 동작과 서비스를 되살린다.
+var
+  WaldServiceStopped: Boolean;
+  WaldInstalled: Boolean;
+
+procedure WaldExec(const FileName, Params: String);
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant(FileName), Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  if Exec(ExpandConstant('{sys}\sc.exe'), 'query Waldlust', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+    and (ResultCode = 0) then
+  begin
+    WaldServiceStopped := True;
+    WaldExec('{sys}\sc.exe', 'failure Waldlust reset= 0 actions= ""');
+    WaldExec('{sys}\net.exe', 'stop Waldlust');
+  end;
+  WaldExec('{sys}\taskkill.exe', '/F /IM Waldlust.exe');
+  WaldExec('{sys}\taskkill.exe', '/F /IM RuntimeBroker_rustdesk.exe');
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    WaldInstalled := True;
+end;
+
+procedure DeinitializeSetup();
+begin
+  if WaldServiceStopped and not WaldInstalled then
+  begin
+    WaldExec('{sys}\sc.exe', 'failure Waldlust reset= 86400 actions= restart/5000/restart/5000/restart/10000');
+    WaldExec('{sys}\sc.exe', 'start Waldlust');
+  end;
+end;
