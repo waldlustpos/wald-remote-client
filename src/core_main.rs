@@ -86,6 +86,9 @@ pub fn core_main() -> Option<Vec<String>> {
         // We can use `crate::check_process("--server", false)` on Windows.
         // Because `--server` process is the System user's process. We can't get the arguments in `check_process()`.
         // We can assume that self service running means the server is also running on Windows.
+        // Waldlust(부록 A-40): 트레이 '종료'로 멈춘 서비스를 다시 켠다(UAC) — 켜지면 아래에서 트레이도 뜬다.
+        #[cfg(target_os = "windows")]
+        crate::platform::start_service_after_tray_quit();
         #[cfg(target_os = "windows")]
         let should_check_start_tray = crate::platform::is_self_service_running()
             && crate::platform::is_cur_exe_the_installed();

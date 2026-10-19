@@ -60,13 +60,17 @@ fn make_tray() -> hbb_common::ResultType<()> {
     let mut event_loop = EventLoopBuilder::new().build();
 
     let tray_menu = Menu::new();
-    let hide_stop_service = crate::ui_interface::get_builtin_option(
-        hbb_common::config::keys::OPTION_HIDE_STOP_SERVICE,
-    ) == "Y";
+    // Waldlust(부록 A-40): Windows 는 두 변형(수신 전용 포함) 모두 '서비스 중지' 대신 '종료'를 둔다.
+    // 서비스 등록은 남기고 서비스·모든 앱 프로세스를 끈다(quit_with_service) — 재부팅·앱 다시 열기로 돌아온다.
+    let hide_stop_service = cfg!(not(windows))
+        && crate::ui_interface::get_builtin_option(
+            hbb_common::config::keys::OPTION_HIDE_STOP_SERVICE,
+        ) == "Y";
+    let quit_label = if cfg!(windows) { "Quit" } else { "Stop service" };
     // The tray icon is only shown when the service is running, so we don't need to check
     // the `stop-service` option here.
     let quit_i = if !hide_stop_service {
-        Some(MenuItem::new(translate("Stop service".to_owned()), true, None))
+        Some(MenuItem::new(translate(quit_label.to_owned()), true, None))
     } else {
         None
     };
@@ -191,7 +195,11 @@ fn make_tray() -> hbb_common::ResultType<()> {
                         return;
                     }
                     */
-                    if !crate::platform::uninstall_service(false, false) {
+                    #[cfg(windows)]
+                    let failed = crate::platform::quit_with_service();
+                    #[cfg(not(windows))]
+                    let failed = crate::platform::uninstall_service(false, false);
+                    if !failed {
                         *control_flow = ControlFlow::Exit;
                     }
                 } else if event.id == open_i.id() {

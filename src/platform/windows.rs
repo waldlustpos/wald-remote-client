@@ -3206,6 +3206,58 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     std::process::exit(0);
 }
 
+// Waldlust(부록 A-40): 트레이 '종료' 가 사용자 LocalConfig 에 남기는 표식. 앱을 다시 열면 서비스를 다시 켠다.
+const WALD_TRAY_QUIT: &str = "wald-tray-quit";
+
+// Waldlust(부록 A-40): 트레이 '종료' — 서비스 등록(자동 시작)은 남기고 서비스와 모든 앱 프로세스를 끈다(UAC).
+// uninstall_service 와 달리 sc delete·stop-service 를 쓰지 않아 재부팅하면 다시 켜진다.
+//  - net stop 은 멈출 때까지 기다린다(서비스가 --server 를 닫는다).
+//  - 세션 0 의 서비스 프로세스는 죽이지 않는다 — 죽이면 sc failure 복구가 5초 뒤 다시 띄운다.
+// uninstall_service 처럼 실패(UAC 취소)면 true 를 돌려주고, 성공하면 돌아오지 않는다.
+pub fn quit_with_service() -> bool {
+    log::info!("Quitting with service...");
+    let filter = format!(" /FI \"SESSION ne 0\" /FI \"PID ne {}\"", get_current_pid());
+    let cmds = format!(
+        "
+    chcp 65001
+    net stop {app_name}
+    taskkill /F /IM {broker_exe}
+    taskkill /F /IM {app_name}.exe{filter}
+    ",
+        app_name = crate::get_app_name(),
+        broker_exe = WIN_TOPMOST_INJECTED_PROCESS_EXE,
+    );
+    if let Err(err) = run_cmds(cmds, false, "quit") {
+        log::debug!("{err}");
+        return true;
+    }
+    config::LocalConfig::set_option(WALD_TRAY_QUIT.to_owned(), "Y".to_owned());
+    std::process::exit(0);
+}
+
+// Waldlust(부록 A-40): 트레이 '종료' 뒤 설치본 앱을 다시 열면 멈춘 서비스를 다시 켠다(UAC).
+// UAC 를 취소하면 표식을 남겨 다음에 열 때 다시 묻는다. 설정에서 서비스를 중지(삭제)했으면 켜지 않는다.
+pub fn start_service_after_tray_quit() {
+    if config::LocalConfig::get_option(WALD_TRAY_QUIT) != "Y" || !is_cur_exe_the_installed() {
+        return;
+    }
+    if Config::get_option("stop-service") != "Y" && !is_self_service_running() {
+        log::info!("Starting service after tray quit...");
+        let cmds = format!(
+            "
+    chcp 65001
+    net start {app_name}
+    ",
+            app_name = crate::get_app_name(),
+        );
+        if let Err(err) = run_cmds(cmds, false, "start_service") {
+            log::debug!("{err}");
+            return;
+        }
+    }
+    config::LocalConfig::set_option(WALD_TRAY_QUIT.to_owned(), "".to_owned());
+}
+
 pub fn install_service() -> bool {
     log::info!("Installing service...");
     let _installing = crate::platform::InstallingService::new();
