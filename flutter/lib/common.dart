@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/common/wald_icons.dart';
 import 'package:flutter_hbb/common/wald_links.dart';
+import 'package:flutter_hbb/common/wald_mac_status_item.dart';
 import 'package:flutter_hbb/common/wald_theme.dart';
 import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
@@ -2866,6 +2867,9 @@ bool isRunningInPortableMode() {
 Future<void> onActiveWindowChanged() async {
   print(
       "[MultiWindowHandler] active window changed: ${rustDeskWinManager.getActiveWindows()}");
+  // Waldlust(DSK-07, 부록 A-41): macOS 에서 원격 서비스가 도는 동안(메뉴 막대 아이콘이 있을 때)은
+  // 마지막 창을 닫아도 앱을 끝내지 않고 백그라운드로 둔다.
+  if (await WaldMacStatusItem.onActiveWindowChanged()) return;
   if (rustDeskWinManager.getActiveWindows().isEmpty) {
     // close all sub windows
     try {

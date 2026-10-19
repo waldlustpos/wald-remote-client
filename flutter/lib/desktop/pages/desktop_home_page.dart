@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
+import 'package:flutter_hbb/common/wald_mac_status_item.dart';
 import 'package:flutter_hbb/common/widgets/wald_app_info.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
@@ -721,6 +722,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         svcStopped.value = v;
         setState(() {});
       }
+      // Waldlust(DSK-07, 부록 A-41): 서비스가 도는 동안 macOS 메뉴 막대 아이콘을 띄운다.
+      await WaldMacStatusItem.sync(serviceRunning: !v);
       if (watchIsCanScreenRecording) {
         if (bind.mainIsCanScreenRecording(prompt: false)) {
           watchIsCanScreenRecording = false;
@@ -760,6 +763,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     });
     Get.put<RxBool>(svcStopped, tag: 'stop-service');
     rustDeskWinManager.registerActiveWindowListener(onActiveWindowChanged);
+    WaldMacStatusItem.init();
 
     screenToMap(window_size.Screen screen) => {
           'frame': {

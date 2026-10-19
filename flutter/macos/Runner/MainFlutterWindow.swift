@@ -91,6 +91,93 @@ enum WaldTitleBar {
     }
 }
 
+// Waldlust(DSK-07, 부록 A-41): 메뉴 막대(상단 바) 아이콘. 원격 서비스가 이 프로세스 안에서 도는 동안
+// Dart(flutter/lib/common/wald_mac_status_item.dart)가 켜고 끈다. '열기'는 Dart 에 알려 메인 창을 띄우고,
+// '종료'는 앱을 끝낸다(Cmd+Q 와 같은 경로 — AppDelegate 가 앱이 띄운 연결 관리 창도 함께 끝낸다).
+final class WaldStatusItem: NSObject {
+    static let shared = WaldStatusItem()
+
+    private var channel: FlutterMethodChannel?
+    private var item: NSStatusItem?
+    /// '종료'를 눌렀다. AppDelegate.applicationShouldTerminate 가 Flutter 종료 처리기(Dart 응답을 기다리다
+    /// 취소될 수 있다 — flutter/lib/common.dart onActiveWindowChanged 주석)를 거치지 않고 바로 끝낸다.
+    private(set) var quitting = false
+
+    func attach(messenger: FlutterBinaryMessenger) {
+        let channel = FlutterMethodChannel(name: "co.kr.waldlust/status_item", binaryMessenger: messenger)
+        channel.setMethodCallHandler { [weak self] call, result in
+            guard call.method == "update", let args = call.arguments as? [String: Any] else {
+                result(FlutterMethodNotImplemented)
+                return
+            }
+            self?.update(args)
+            result(nil)
+        }
+        self.channel = channel
+    }
+
+    private func update(_ args: [String: Any]) {
+        guard args["visible"] as? Bool == true else {
+            if let item = item {
+                NSStatusBar.system.removeStatusItem(item)
+                self.item = nil
+            }
+            return
+        }
+        let item = self.item ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        self.item = item
+        if let data = (args["icon"] as? FlutterStandardTypedData)?.data,
+           let image = NSImage(data: data), image.size.height > 0 {
+            // src/tray.rs(tray-icon 크레이트)와 같이 높이 18pt 에 맞추고 템플릿으로 그린다(밝은·어두운 막대 모두).
+            let height: CGFloat = 18
+            image.size = NSSize(width: image.size.width * height / image.size.height, height: height)
+            image.isTemplate = true
+            item.button?.image = image
+        }
+        item.button?.toolTip = args["tooltip"] as? String
+        let menu = NSMenu()
+        let open = NSMenuItem(title: args["open"] as? String ?? "Open", action: #selector(onOpen), keyEquivalent: "")
+        open.target = self
+        let quit = NSMenuItem(title: args["quit"] as? String ?? "Quit", action: #selector(onQuit), keyEquivalent: "")
+        quit.target = self
+        menu.addItem(open)
+        menu.addItem(quit)
+        item.menu = menu
+    }
+
+    /// 아이콘이 떠 있으면(창을 닫아 백그라운드일 수 있으면) Dart 에 메인 창을 띄우라고 알리고 true 를 돌려준다.
+    func requestOpen() -> Bool {
+        guard item != nil, let channel = channel else { return false }
+        channel.invokeMethod("open", arguments: nil)
+        return true
+    }
+
+    @objc private func onOpen() {
+        channel?.invokeMethod("open", arguments: nil)
+    }
+
+    @objc private func onQuit() {
+        quitting = true
+        NSApp.terminate(nil)
+    }
+
+    /// 이 프로세스가 띄운 같은 실행 파일의 자식(앱 안 서버가 띄운 연결 관리 창 `--cm`)을 끝낸다.
+    /// 메인 앱만 끝나면 연결 관리 창이 '연결 끊김' 탭으로 남는다. 자식만 보므로 연결 관리 창이 끝날 때
+    /// 메인 앱을 건드리지 않고, launchd 가 띄운 `--server` 도 건드리지 않는다.
+    static func terminateChildInstances() {
+        guard let exe = Bundle.main.executableURL?.resolvingSymlinksInPath().path else { return }
+        var pids = [pid_t](repeating: 0, count: 64)
+        guard proc_listchildpids(getpid(), &pids, Int32(pids.count * MemoryLayout<pid_t>.size)) > 0 else { return }
+        var path = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        for pid in pids where pid > 0 {
+            guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { continue }
+            if URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath().path == exe {
+                kill(pid, SIGTERM)
+            }
+        }
+    }
+}
+
 class MainFlutterWindow: NSWindow {
     override func awakeFromNib() {
         rustdesk_core_main();
@@ -101,6 +188,8 @@ class MainFlutterWindow: NSWindow {
         // register self method handler
         let registrar = flutterViewController.registrar(forPlugin: "RustDeskPlugin")
         setMethodHandler(registrar: registrar)
+        // Waldlust(DSK-07, 부록 A-41): 메뉴 막대 아이콘 채널은 메인 창 엔진에만 붙인다.
+        WaldStatusItem.shared.attach(messenger: registrar.messenger)
 
         RegisterGeneratedPlugins(registry: flutterViewController)
 
