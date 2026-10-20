@@ -52,8 +52,14 @@ class PeerTabModel with ChangeNotifier {
         }
         return list;
       }();
-  final List<int> orders =
-      List.generate(maxTabCount, (index) => index, growable: false);
+  // Waldlust(DSK-04 — 부록 A-45): 기본 순서는 주소록이 맨 앞(사용자가 끌어 바꾼 순서는 그대로 쓴다).
+  final List<int> orders = List.of([
+    PeerTabIndex.ab.index,
+    PeerTabIndex.recent.index,
+    PeerTabIndex.fav.index,
+    PeerTabIndex.lan.index,
+    PeerTabIndex.group.index,
+  ], growable: false);
   List<int> get visibleEnabledOrderedIndexs =>
       orders.where((e) => isVisibleEnabled[e]).toList();
   List<Peer> _selectedPeers = List.empty(growable: true);
@@ -109,10 +115,13 @@ class PeerTabModel with ChangeNotifier {
       debugPrint("failed to get peer tab order list: $e");
     }
     // init currentTab
+    // Waldlust(DSK-04 — 부록 A-45): 고른 탭이 저장돼 있지 않으면 주소록부터 연다
+    // (계정 기능이 꺼진 빌드는 아래에서 맨 앞의 보이는 탭으로 바뀐다).
     _currentTab =
-        int.tryParse(bind.getLocalFlutterOption(k: kOptionPeerTabIndex)) ?? 0;
+        int.tryParse(bind.getLocalFlutterOption(k: kOptionPeerTabIndex)) ??
+            PeerTabIndex.ab.index;
     if (_currentTab < 0 || _currentTab >= maxTabCount) {
-      _currentTab = 0;
+      _currentTab = PeerTabIndex.ab.index;
     }
     _trySetCurrentTabToFirstVisibleEnabled();
   }
