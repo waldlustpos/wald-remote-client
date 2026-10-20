@@ -7,6 +7,8 @@
 # 결과:  ~/wald-build/waldlust-<버전>-android-localtest[-incoming].apk(prodtest 는 -android-prodtest), 로그는 ~/wald-build/logs/
 #        + ~/wald-build/dist/<버전>-<sha9>-<대상>/waldlust-remote[-incoming]-<버전>-android[-<대상>].apk 와 manifest-android-<변형>.txt
 #        (설치 파일 이름 규칙 — 결정 D36: release 는 '-<대상>' 을 붙이지 않는다. 예 waldlust-remote-incoming-1.5.0-android.apk)
+#        수신 전용이면 도우미 앱(wald-helper — 부록 A-44, 결정 D39)도 같은 버전·같은 서명으로 만든다:
+#        dist 의 waldlust-remote-helper-<버전>-android[-<대상>].apk 와 manifest-android-helper.txt. wald-helper 가 없는 옛 ref 는 건너뛴다.
 #
 # 원칙
 # - 비관리 빌드: WALDLUST_PRESET_PASSWORD 를 넣지 않는다(무인 기본값·기기별 비밀번호 없음).
@@ -208,6 +210,22 @@ VER=$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
 APK="$OUT/waldlust-$VER-android-$KIND$SUFFIX.apk"
 cp flutter/build/app/outputs/flutter-apk/app-release.apk "$APK" || die "APK 복사"
 
+# 3b) 수신 전용: 도우미 앱(wald-helper — 부록 A-44 1단계, 결정 D39). 메인 앱과 같은 버전(정식은 태그의 versionCode)·같은 서명
+#     (release = 릴리즈 키, 그 밖 = debug 키)으로 만든다. Flutter·Rust 없이 Gradle 만 쓴다. wald-helper 가 없는 옛 ref 는 건너뛴다.
+HAPK=""
+if [ "$VARIANT" = incoming ] && [ -d wald-helper ]; then
+  step helper
+  HVCODE="${VCODE:-$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f2)}"
+  echo "sdk.dir=$HOME/Library/Android/sdk" > wald-helper/local.properties
+  [ "$TARGET" != release ] || cp "$KEYS/android-release.properties" wald-helper/key.properties || die "도우미 키 설정 복사"
+  ( cd wald-helper && ./gradlew --no-daemon -q :app:assembleRelease -PwaldVersionCode="$HVCODE" -PwaldVersionName="$VER"
+  ) > "$LOG/helper.log" 2>&1; hrc=$?
+  rm -f wald-helper/key.properties   # release 에서 복사한 키 설정
+  [ $hrc -eq 0 ] || die helper
+  HAPK="$OUT/waldlust-$VER-android-$KIND-helper.apk"
+  cp wald-helper/app/build/outputs/apk/release/app-release.apk "$HAPK" || die "도우미 APK 복사"
+fi
+
 # 4) 확인: 정체·ABI·서명, ABI 마다 heartbeat 주소(기대값 1 이상, 운영 0 — prodtest 는 기대값이 곧 운영)와 API 서버를 넣었으면 그 값(1 이상).
 step verify
 BT=$(ls -d "$HOME/Library/Android/sdk/build-tools/"* | tail -1)
@@ -236,6 +254,16 @@ if [ "$TARGET" = release ]; then
   echo "$PKG_LINE" | grep -q "versionCode='$VCODE'" || die "versionCode 가 $VCODE 가 아니다"
 fi
 echo "done: $APK"
+if [ -n "$HAPK" ]; then
+  HBADGING=$("$BT/aapt2" dump badging "$HAPK")
+  HPKG_LINE=$(echo "$HBADGING" | grep -E '^package:')
+  echo "helper $HPKG_LINE"
+  HSIGNER=$("$BT/apksigner" verify --print-certs "$HAPK" | grep -E "Signer #1 certificate SHA-256" | awk '{print $NF}')
+  [ -n "$HSIGNER" ] && [ "$HSIGNER" = "$SIGNER" ] || die "도우미 서명이 메인 앱과 다르다 — 이 APK 는 배포하지 않는다"
+  echo "$HPKG_LINE" | grep -q "name='co.kr.waldlust.remote.helper'" || die "도우미 패키지가 co.kr.waldlust.remote.helper 가 아니다"
+  echo "$HPKG_LINE" | grep -q "versionCode='$HVCODE'" || die "도우미 versionCode 가 $HVCODE 가 아니다"
+  echo "done: $HAPK"
+fi
 
 # 5) dist/<버전>-<sha9>-<대상>/ 에 APK 와 manifest 를 모은다. 시험본은 이름에 대상을 붙인다(build-windows-local.ps1 -Inno 와 같은 규칙 — D36).
 step dist
@@ -262,6 +290,23 @@ cp "$APK" "$DAPK" || die "dist 복사"
   echo "sha256: $(shasum -a 256 "$DAPK" | awk '{print $1}')"
   echo "built: $(date '+%Y-%m-%d %H:%M:%S')"
 } > "$DIST/manifest-android-$VARIANT.txt"
+if [ -n "$HAPK" ]; then
+  HDAPK="$DIST/waldlust-remote-helper-$VER-android$TSUF.apk"
+  cp "$HAPK" "$HDAPK" || die "dist 도우미 복사"
+  {
+    echo "ref: $BASE ($COMMIT)"
+    echo "platform: android (no native code)"
+    echo "variant: helper"
+    echo "target: $TARGET"
+    echo "package: $(echo "$HPKG_LINE" | sed -E "s/.*name='([^']*)'.*versionCode='([^']*)'.*versionName='([^']*)'.*/\1 versionCode=\2 versionName=\3/")"
+    echo "signer sha256: $HSIGNER"
+    [ "$TARGET" = release ] && echo "signing: release key ($KEYS/android-release.properties)"
+    echo "apk: ${HDAPK:t}"
+    echo "size: $(stat -f %z "$HDAPK")"
+    echo "sha256: $(shasum -a 256 "$HDAPK" | awk '{print $1}')"
+    echo "built: $(date '+%Y-%m-%d %H:%M:%S')"
+  } > "$DIST/manifest-android-helper.txt"
+fi
 # 6) release: 오픈소스 고지(D35)를 dist 에 둔다. APK 안의 Flutter NOTICES 와 vcpkg(arm-android — 마지막 ABI, 포트 구성은 두 ABI 가 같다).
 if [ "$TARGET" = release ]; then
   step notices
@@ -271,6 +316,7 @@ if [ "$TARGET" = release ]; then
   cp NOTICE "$DIST/NOTICE.txt" && cp LICENCE "$DIST/LICENCE.txt" || die "dist 고지 복사"
 fi
 echo "dist: $DAPK"
+[ -n "$HAPK" ] && echo "dist: $HDAPK"
 if [ "$TARGET" = release ]; then
   echo "주의: 앱 ID 가 co.kr.waldlust.remote 로 바뀌었다(D35) — 옛 앱(com.carriez.flutter_hbb)은 따로 지운다. 새 설치는 ID 가 새로 생긴다."
 else
