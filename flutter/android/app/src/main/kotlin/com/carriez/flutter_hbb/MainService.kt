@@ -417,6 +417,7 @@ class MainService : Service() {
             intent.getParcelableExtra<Intent>(EXT_MEDIA_PROJECTION_RES_INTENT)?.let {
                 mediaProjection =
                     mediaProjectionManager.getMediaProjection(Activity.RESULT_OK, it)
+                waldPrepareProjection() // Waldlust(DSK-02): Android 14 재동의 창 막기·중지 감지
                 checkMediaPermission()
                 _isReady = true
             } ?: let {
@@ -634,6 +635,44 @@ class MainService : Service() {
         }
     }
 
+    // Waldlust(DSK-02): Android 14 는 화면 공유 동의 뒤 5분 안에 가상 화면을 만들지 않으면 토큰을 무효로 보고, targetSdk 33 앱이 그 뒤에
+    // 만들면 시스템이 재동의 창을 띄운다. 앱이 요청한 창이 아니라 자동 승인이 켜져 있지 않아 화면 공유가 멈췄다(IM-H092W — 되살린 뒤
+    // 5분 42초 만의 첫 접속이 '화면 기다리는 중'). 동의를 받자마자 출력 없는 가상 화면을 만들어 두고 접속 때는 출력만 붙인다(아래 재사용).
+    // 시스템이 화면 공유를 멈추면 상태를 비워 다음 접속 때 다시 요청(자동 승인)하게 한다 — 그대로 두면 끊긴 토큰으로 계속 기다린다.
+    private fun waldPrepareProjection() {
+        val mp = mediaProjection ?: return
+        mp.registerCallback(object : MediaProjection.Callback() {
+            override fun onStop() {
+                waldOnProjectionStopped(mp)
+            }
+        }, Handler(Looper.getMainLooper()))
+        if (!reuseVirtualDisplay) return
+        // 앞선 토큰의 가상 화면은 새 토큰으로 다시 만든다(시스템이 앞선 토큰을 멈추면 그 화면은 미러링하지 않는다).
+        virtualDisplay?.release()
+        virtualDisplay = null
+        try {
+            virtualDisplay = mp.createVirtualDisplay(
+                "RustDeskVD",
+                SCREEN_INFO.width, SCREEN_INFO.height, SCREEN_INFO.dpi, VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                if (_isStart) surface else null, null, null
+            )
+            Log.i(logTag, "virtual display prepared")
+        } catch (e: Exception) {
+            Log.w(logTag, "prepare virtual display failed: $e")
+        }
+    }
+
+    private fun waldOnProjectionStopped(mp: MediaProjection) {
+        if (mediaProjection !== mp) return
+        Log.w(logTag, "media projection stopped by system")
+        if (_isStart) stopCapture()
+        virtualDisplay?.release()
+        virtualDisplay = null
+        mediaProjection = null
+        _isReady = false
+        checkMediaPermission()
+    }
+
     // https://github.com/bk138/droidVNC-NG/blob/b79af62db5a1c08ed94e6a91464859ffed6f4e97/app/src/main/java/net/christianbeier/droidvnc_ng/MediaProjectionService.java#L250
     // Reuse virtualDisplay if it exists, to avoid media projection confirmation dialog every connection.
     private fun createOrSetVirtualDisplay(mp: MediaProjection, s: Surface) {
@@ -642,6 +681,12 @@ class MainService : Service() {
                 it.resize(SCREEN_INFO.width, SCREEN_INFO.height, SCREEN_INFO.dpi)
                 it.setSurface(s)
             } ?: let {
+                // Waldlust(DSK-02): Android 14+ 는 여기서 재동의 창이 뜰 수 있다 — 자동 승인을 켠다(이 앱·도우미 접근성)
+                if (Build.VERSION.SDK_INT >= 34) {
+                    InputService.autoAcceptProjection = true
+                    WaldInputBridge.armProjectionAccept(15_000)
+                    serviceHandler?.postDelayed({ InputService.autoAcceptProjection = false }, 15_000)
+                }
                 virtualDisplay = mp.createVirtualDisplay(
                     "RustDeskVD",
                     SCREEN_INFO.width, SCREEN_INFO.height, SCREEN_INFO.dpi, VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
