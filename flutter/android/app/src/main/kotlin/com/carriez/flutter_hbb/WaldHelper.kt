@@ -107,6 +107,9 @@ object WaldHelper {
             "hasBundle" to (bundled != null),
             "needsUpdate" to (installed != null && bundled != null && bundled > installed),
             "adbGranted" to (ContextCompat.checkSelfPermission(context, WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED),
+            // 2단계(결정 D41): 도우미에 입력 제어 기능이 있는가 / 도우미 입력 제어가 켜져 있는가
+            "inputCapable" to (installed != null && WaldInputBridge.helperInputComponent(context) != null),
+            "inputOn" to WaldInputBridge.isHelperInputOn(),
         )
     }
 
@@ -126,6 +129,8 @@ object WaldHelper {
         pendingInstall = false
         return try {
             val installer = activity.packageManager.packageInstaller
+            // setPackageSource 는 부르지 않는다(UNSPECIFIED): LOCAL_FILE·DOWNLOADED_FILE 로 표시하면 Android 13·14 가 도우미 접근성에
+            // '제한된 설정'을 건다. 세션 설치라 지금은 도우미 접근성 토글이 막히지 않는다(2단계 — 결정 D41).
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
                 setAppPackageName(PKG)
             }
@@ -189,6 +194,9 @@ class WaldHelperInstallReceiver : BroadcastReceiver() {
             PackageInstaller.STATUS_SUCCESS -> {
                 Log.d(WaldHelper.logTag, "helper installed")
                 WaldHelper.activateIfStopped(context)
+                // 2단계: 새 도우미의 입력 제어에 연결하고, adb 권한이 있으면 도우미 접근성을 켠다(이 앱 것은 켜진 뒤 뺀다).
+                WaldInputBridge.ensureBound(context)
+                RootUtil.enableInputServiceIfPermitted(context)
                 WaldHelper.notifyFlutter("installed")
             }
             else -> {

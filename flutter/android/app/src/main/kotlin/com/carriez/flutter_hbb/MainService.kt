@@ -78,6 +78,8 @@ class MainService : Service() {
             Log.d(logTag,"Turn on Screen")
             wakeLock.acquire(5000)
         } else {
+            // Waldlust(DSK-02 2단계): 도우미 입력 제어가 켜져 있으면 도우미로(강제 종료에도 남는 쪽)
+            if (WaldInputBridge.pointer(kind, mask, x, y)) return
             when (kind) {
                 0 -> { // touch
                     InputService.ctx?.onTouchInput(mask, x, y)
@@ -94,6 +96,7 @@ class MainService : Service() {
     @Keep
     @RequiresApi(Build.VERSION_CODES.N)
     fun rustKeyEventInput(input: ByteArray) {
+        if (WaldInputBridge.key(input)) return // Waldlust(DSK-02 2단계)
         InputService.ctx?.onKeyEvent(input)
     }
 
@@ -311,6 +314,8 @@ class MainService : Service() {
         FFI.startServer(configPath, "")
 
         createForegroundNotification()
+        // Waldlust(DSK-02 2단계): 원격지원 도우미의 입력 제어에 연결(부팅·도우미 깨우기로 앱 화면 없이 시작돼도)
+        WaldInputBridge.ensureBound(this)
     }
 
     override fun onDestroy() {
@@ -398,7 +403,7 @@ class MainService : Service() {
                 // Waldlust(무인): 부팅 자동시작 시 루팅 박스라면 접근성(입력)·백그라운드 권한을
                 // root 로 확정해 사람 손 없이 온라인+입력이 되게 한다(루트 없으면 조용히 폴백).
                 Thread {
-                    RootUtil.ensureUnattendedGrants(packageName)
+                    RootUtil.ensureUnattendedGrants(this)
                 }.start()
                 FFI.startService()
             }
@@ -437,9 +442,10 @@ class MainService : Service() {
         // Waldlust(무인): 화면공유 동의 팝업을 접근성 서비스가 자동 승인하도록 플래그를 켠다.
         // 접근성이 아직 안 켜져 있으면(루팅) root 로 켜서 InputService 가 팝업을 클릭할 수 있게 한다.
         InputService.autoAcceptProjection = true
-        if (!InputService.isOpen) {
+        WaldInputBridge.armProjectionAccept(20_000) // Waldlust(DSK-02 2단계): 도우미 접근성도(강제 종료 뒤에도 켜져 있다)
+        if (!WaldInputBridge.isInputOpen()) {
             RootUtil.enableInputServiceIfPermitted(this)
-            Thread { RootUtil.ensureUnattendedGrants(packageName) }.start()
+            Thread { RootUtil.ensureUnattendedGrants(this) }.start()
         }
         // 안전장치: 20초 안에 승인되지 않으면 자동승인 플래그를 해제(엉뚱한 팝업 오클릭 방지).
         serviceHandler?.postDelayed({ InputService.autoAcceptProjection = false }, 20_000)
@@ -596,7 +602,7 @@ class MainService : Service() {
         Handler(Looper.getMainLooper()).post {
             MainActivity.flutterMethodChannel?.invokeMethod(
                 "on_state_changed",
-                mapOf("name" to "input", "value" to InputService.isOpen.toString())
+                mapOf("name" to "input", "value" to WaldInputBridge.isInputOpen().toString())
             )
         }
         return isReady

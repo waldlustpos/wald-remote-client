@@ -26,6 +26,9 @@ PKG="co.kr.waldlust.remote"
 NS="com.carriez.flutter_hbb"
 ACCESS_SVC="$PKG/$NS.InputService"
 MAIN_ACT="$PKG/$NS.MainActivity"
+# 원격지원 도우미(DSK-02 — 2단계, 결정 D41): 도우미에 입력 제어(접근성)가 있으면 그쪽을 켠다(앱을 강제 종료해도 남는다).
+HELPER_PKG="co.kr.waldlust.remote.helper"
+HELPER_SVC="$HELPER_PKG/$HELPER_PKG.InputService"
 
 SERIAL=""
 APK=""
@@ -52,6 +55,12 @@ echo "== 1) 앱 1회 실행 (stopped-state 해제 + 부팅시작 기본 ON) =="
 sleep 3
 
 echo "== 2) 접근성(입력) 활성화 =="
+if "${ADB[@]}" shell dumpsys package "$HELPER_PKG" 2>/dev/null | grep -q "$HELPER_PKG.InputService"; then
+  ACCESS_SVC="$HELPER_SVC"
+  # 아이콘 없는 도우미는 새로 설치하면 stopped — 신호로 푼다(원격 앱이 켜질 때도 푼다)
+  "${ADB[@]}" shell am broadcast -f 0x20 -a "$HELPER_PKG.ACTIVATE" -n "$HELPER_PKG/.BootReceiver" >/dev/null 2>&1 || true
+  echo "- 도우미 입력 제어 사용: $ACCESS_SVC"
+fi
 CUR="$("${ADB[@]}" shell settings get secure enabled_accessibility_services | tr -d '\r')"
 if [ "$CUR" = "null" ] || [ -z "$CUR" ]; then NEW="$ACCESS_SVC"; else
   case "$CUR" in *"$ACCESS_SVC"*) NEW="$CUR";; *) NEW="$CUR:$ACCESS_SVC";; esac

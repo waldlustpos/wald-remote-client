@@ -45,25 +45,35 @@ object RootUtil {
      * 앱을 열 때·화면공유를 요청할 때 다시 켠다. 설치자가 adb 로 한 번 허용해 둔 기기에서만 된다:
      * `adb shell pm grant <패키지> android.permission.WRITE_SECURE_SETTINGS`(앱을 지우기 전까지 유지).
      * 권한이 없으면 아무것도 하지 않는다(설치자 수동 활성화 그대로). 켰으면(이미 켜져 있었으면) true.
+     * 2단계(결정 D41): 도우미에 입력 기능이 있으면 이 앱 대신 도우미 접근성을 켠다(WaldInputBridge — 브리지 연결 뒤).
      */
     fun enableInputServiceIfPermitted(context: Context): Boolean {
         if (ContextCompat.checkSelfPermission(context, WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
             return false
         }
+        if (WaldInputBridge.helperInputComponent(context) != null) {
+            WaldInputBridge.requestHelperEnable(context)
+            return true
+        }
         if (InputService.isOpen) return true
+        return enableWithRetry(context, ComponentName(context, InputService::class.java)) { InputService.isOpen }
+    }
+
+    /** service 를 접근성 목록에 넣는다. 곧 연결되지 않으면(isConnected) 뺐다가 다시 넣는다. */
+    fun enableWithRetry(context: Context, service: ComponentName, isConnected: () -> Boolean): Boolean {
         val now = SystemClock.elapsedRealtime()
         if (now - lastEnableMs < 3_000L) return true // 앱 시작·서비스 시작이 겹쳐 불려도 한 번만
         lastEnableMs = now
         val app = context.applicationContext
-        if (!putInputServiceEnabled(app, true)) return false
+        if (!putInputServiceEnabled(app, true, service)) return false
         // Android 11 은 강제 종료된 접근성 서비스를 '충돌'로 기록해 목록에 다시 넣어도 바인드하지 않는다(D2s).
         // 곧 연결되지 않으면 목록에서 뺐다가 다시 넣어 그 기록을 지운다.
         val handler = Handler(Looper.getMainLooper())
         handler.postDelayed({
-            if (!InputService.isOpen) {
+            if (!isConnected()) {
                 Log.d(logTag, "accessibility not bound, toggling off and on")
-                putInputServiceEnabled(app, false)
-                handler.postDelayed({ putInputServiceEnabled(app, true) }, 500)
+                putInputServiceEnabled(app, false, service)
+                handler.postDelayed({ putInputServiceEnabled(app, true, service) }, 500)
             }
         }, 1_500)
         return true
@@ -72,16 +82,21 @@ object RootUtil {
     @Volatile
     private var lastEnableMs = 0L
 
-    private fun putInputServiceEnabled(context: Context, enabled: Boolean): Boolean {
+    /** service(기본 = 이 앱 InputService)를 접근성 목록에 넣거나 뺀다. 다른 앱 항목은 그대로 둔다. */
+    fun putInputServiceEnabled(
+        context: Context,
+        enabled: Boolean,
+        service: ComponentName = ComponentName(context, InputService::class.java)
+    ): Boolean {
         return try {
-            val service = ComponentName(context, InputService::class.java).flattenToString()
             val resolver = context.contentResolver
             val current = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
-            val others = current.split(':').filter { it.isNotBlank() && !it.equals(service, ignoreCase = true) }
-            val merged = (if (enabled) others + service else others).joinToString(":")
+            // 짧은 형식(패키지/.클래스)으로 저장돼 있을 수 있어 컴포넌트로 비교한다.
+            val others = current.split(':').filter { it.isNotBlank() && ComponentName.unflattenFromString(it) != service }
+            val merged = (if (enabled) others + service.flattenToString() else others).joinToString(":")
             if (merged != current) {
                 Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, merged)
-                Log.d(logTag, "accessibility ${if (enabled) "re-enabled" else "disabled"} via WRITE_SECURE_SETTINGS")
+                Log.d(logTag, "accessibility ${service.shortClassName} ${if (enabled) "enabled" else "disabled"} via WRITE_SECURE_SETTINGS")
             }
             if (enabled) Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
             true
@@ -103,10 +118,12 @@ object RootUtil {
      *  - 다른 앱 위에 표시(SYSTEM_ALERT_WINDOW) — BootReceiver 통과 조건
      * 이미 되어 있으면 무해하게 통과. 부팅 시/서비스 시작 시 호출한다.
      */
-    fun ensureUnattendedGrants(pkg: String) {
-        // 접근성(입력) 활성화
+    fun ensureUnattendedGrants(context: Context) {
+        val pkg = context.packageName
+        // 접근성(입력) 활성화 — 도우미에 입력 기능이 있으면 도우미 접근성(2단계, 결정 D41)
         // applicationId(co.kr.waldlust.remote)와 Kotlin 네임스페이스가 달라 클래스 이름은 전체 이름으로 적는다(Q-29, D35).
-        val service = "$pkg/com.carriez.flutter_hbb.InputService"
+        val service = WaldInputBridge.helperInputComponent(context)?.flattenToString()
+            ?: "$pkg/com.carriez.flutter_hbb.InputService"
         val current = runAsRoot("settings get secure enabled_accessibility_services")?.trim() ?: ""
         if (!current.contains(service)) {
             val merged = if (current.isBlank() || current == "null") service else "$current:$service"

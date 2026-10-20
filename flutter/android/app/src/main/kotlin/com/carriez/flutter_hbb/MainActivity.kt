@@ -69,7 +69,7 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         // Waldlust(DSK-02 — 결정 D40): '출처를 알 수 없는 앱 설치'를 허용하고 돌아오면 도우미 설치를 이어 간다.
         WaldHelper.resumePendingInstall(this)
-        val inputPer = InputService.isOpen
+        val inputPer = WaldInputBridge.isInputOpen()
         activity.runOnUiThread {
             flutterMethodChannel?.invokeMethod(
                 "on_state_changed",
@@ -126,6 +126,8 @@ class MainActivity : FlutterActivity() {
         RootUtil.enableInputServiceIfPermitted(this)
         // Waldlust(DSK-02 — 결정 D40): 아이콘 없는 도우미는 사람이 열 수 없으니 이 앱이 켜질 때 stopped 를 풀어 준다.
         WaldHelper.activateIfStopped(this)
+        // Waldlust(DSK-02 2단계 — 결정 D41): 도우미 입력 제어에 연결(adb 권한이 없어도)
+        WaldInputBridge.ensureBound(this)
     }
 
     override fun onDestroy() {
@@ -241,7 +243,7 @@ class MainActivity : FlutterActivity() {
                 "check_service" -> {
                     Companion.flutterMethodChannel?.invokeMethod(
                         "on_state_changed",
-                        mapOf("name" to "input", "value" to InputService.isOpen.toString())
+                        mapOf("name" to "input", "value" to WaldInputBridge.isInputOpen().toString())
                     )
                     Companion.flutterMethodChannel?.invokeMethod(
                         "on_state_changed",
@@ -254,9 +256,10 @@ class MainActivity : FlutterActivity() {
                         InputService.ctx?.disableSelf()
                     }
                     InputService.ctx = null
+                    WaldInputBridge.disableInput() // Waldlust(DSK-02 2단계): 도우미 입력 제어도 끈다
                     Companion.flutterMethodChannel?.invokeMethod(
                         "on_state_changed",
-                        mapOf("name" to "input", "value" to InputService.isOpen.toString())
+                        mapOf("name" to "input", "value" to WaldInputBridge.isInputOpen().toString())
                     )
                     result.success(true)
                 }

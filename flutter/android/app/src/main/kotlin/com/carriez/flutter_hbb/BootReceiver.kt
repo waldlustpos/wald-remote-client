@@ -32,7 +32,7 @@ class BootReceiver : BroadcastReceiver() {
             if (!XXPermissions.isGranted(context, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, SYSTEM_ALERT_WINDOW)){
                 // Waldlust(무인): 루팅 박스면 필요한 권한을 root 로 확정하고 계속 진행한다.
                 // (앱을 한 번도 안 열었어도 설치+루팅+재부팅만으로 자동 동작하게 함)
-                RootUtil.ensureUnattendedGrants(context.packageName)
+                RootUtil.ensureUnattendedGrants(context)
                 if (!XXPermissions.isGranted(context, REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, SYSTEM_ALERT_WINDOW)){
                     Log.d(logTag, "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS or SYSTEM_ALERT_WINDOW is not granted (no root?)")
                     return
