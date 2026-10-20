@@ -25,8 +25,10 @@ const kWaldAdbGrantCommand =
 /// 앱을 연 동안(프로세스) 한 번만 설치를 권한다.
 bool _waldHelperPrompted = false;
 
-/// 앱을 연 동안(프로세스) 한 번만 도우미 입력 제어를 켜라고 권한다.
+/// 앱을 연 동안(프로세스) 한 번만 도우미 입력 제어를 켜라고 권한다. 이번에 한 번이라도 켜져 있었으면 권하지 않는다
+/// (입력 제어 토글로 일부러 끈 직후 다시 권하지 않게).
 bool _waldHelperInputPrompted = false;
+bool _waldHelperInputSeenOn = false;
 
 /// 도우미에 입력 제어 기능이 있다(마지막으로 읽은 값) — 입력 제어 안내(server_model.dart showInputWarnAlert)가 도우미 항목을 가리킨다.
 bool waldHelperInputCapable = false;
@@ -126,7 +128,9 @@ class _WaldHelperCardState extends State<WaldHelperCard>
 
   // 도우미가 최신인데 도우미 입력 제어가 꺼져 있고 adb 설정도 없으면 한 번 켜라고 권한다(adb 가 있으면 앱이 켠다).
   void _maybePromptInput(_WaldHelperStatus status, bool serviceRunning) {
+    if (status.inputOn) _waldHelperInputSeenOn = true;
     if (_waldHelperInputPrompted ||
+        _waldHelperInputSeenOn ||
         !serviceRunning ||
         !status.helperOk ||
         !status.inputCapable ||
