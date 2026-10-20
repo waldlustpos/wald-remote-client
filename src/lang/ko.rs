@@ -675,7 +675,8 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         // Waldlust(DSK-02 2단계 — 결정 D41): 도우미의 입력 제어(접근성).
         ("wald-helper-input-row", "입력 제어(도우미)"),
         ("wald-helper-input-on-tip", "켜짐 — 앱을 강제 종료해도 원격 입력과 화면 공유 자동 승인이 유지됩니다."),
-        ("wald-helper-input-off-tip", "꺼짐 — 접근성 설정에서 'Waldlust 원격지원 입력(도우미)'를 켭니다. 기기에 따라 '설치된 앱'·'다운로드한 앱'·'서비스' 아래에 있습니다."),
+        ("wald-helper-input-off-tip", "꺼짐 — 접근성 설정에서 'Waldlust 원격지원 입력(도우미)'를 켭니다. 기기에 따라 '설치된 앱'·'다운로드한 앱'·'서비스' 아래에 있습니다. 회색이라 켤 수 없으면 설정 → 애플리케이션 → Waldlust 원격지원 도우미 → ⋮ → '제한된 설정 허용' 뒤 다시 켭니다."),
+        ("wald-helper-install-blocked-tip", "Google Play 프로텍트가 도우미 설치를 막았습니다. [도우미 설치]를 다시 누르고 경고 창에서 '세부정보 더보기 → 무시하고 설치'를 고릅니다(기기 PIN 필요)."),
         ("wald-helper-input-open", "접근성 설정 열기"),
         ("wald-helper-input-guide-tip", "다음 시스템 설정 페이지에서 [Waldlust 원격지원 입력(도우미)]를 켜세요. '(도우미)'가 붙지 않은 항목은 켜지 않아도 됩니다."),
         ("wald-helper-input-prompt-title", "도우미 입력 제어를 켤까요?"),

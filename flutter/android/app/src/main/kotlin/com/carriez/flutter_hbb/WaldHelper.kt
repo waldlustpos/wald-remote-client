@@ -202,8 +202,13 @@ class WaldHelperInstallReceiver : BroadcastReceiver() {
             else -> {
                 val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
                 Log.w(WaldHelper.logTag, "helper install status $status: $message")
+                // BLOCKED: Google Play 프로텍트 등이 막음(Android 14 GMS 기기는 도우미를 '유해한 앱'으로 막는다 — 결정 D41, 넘기는 법을 안내)
                 WaldHelper.notifyFlutter(
-                    if (status == PackageInstaller.STATUS_FAILURE_ABORTED) "aborted" else "failed", message
+                    when (status) {
+                        PackageInstaller.STATUS_FAILURE_ABORTED -> "aborted"
+                        PackageInstaller.STATUS_FAILURE_BLOCKED -> "blocked"
+                        else -> "failed"
+                    }, message
                 )
             }
         }

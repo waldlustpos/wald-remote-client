@@ -970,6 +970,9 @@ void androidChannelInit() {
               showToast(translate("wald-helper-installed-toast"));
             } else if (event == "failed") {
               showToast(translate("wald-helper-install-failed-tip"));
+            } else if (event == "blocked") {
+              showToast(translate("wald-helper-install-blocked-tip"),
+                  timeout: const Duration(seconds: 10));
             }
             waldHelperChanged.value++;
             break;
