@@ -44,6 +44,7 @@ class InputBridgeService : Service() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     InputService.ctx?.cancelOngoingGesture()
                 }
+                MainWatcher.onMainDied("process died")
             }
         }
 
@@ -90,6 +91,7 @@ class InputBridgeService : Service() {
 
         override fun registerCallback(cb: IWaldInputCallback?) {
             if (cb != null) callbacks.register(cb)
+            MainWatcher.onMainRegistered()
         }
 
         override fun unregisterCallback(cb: IWaldInputCallback?) {

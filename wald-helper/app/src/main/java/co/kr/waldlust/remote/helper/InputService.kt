@@ -772,6 +772,7 @@ class InputService : AccessibilityService() {
         Log.d(logTag, "fakeEditTextForTextStateCalculation layout:$layout")
         Log.i(logTag, "onServiceConnected!")
         InputBridgeService.notifyInputState(true)
+        MainWatcher.start(this)
         // 동의 팝업이 이 서비스 연결보다 먼저 떴을 수 있다 — 연결 직후 몇 번 찾아 승인한다.
         if (autoAcceptProjection) {
             for (delayMs in longArrayOf(0L, 500L, 1500L, 3000L)) {

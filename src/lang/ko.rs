@@ -656,7 +656,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         // Waldlust(DSK-02 — 결정 D40): 수신 전용 Android 홈의 '자동 복구' 카드(flutter/lib/mobile/widgets/wald_helper_card.dart).
         ("wald-helper-card-title", "자동 복구"),
         ("wald-helper-row", "도우미 앱"),
-        ("wald-helper-installed-tip", "설치됨 — 앱을 강제 종료한 채 재부팅해도 원격이 다시 켜집니다."),
+        ("wald-helper-installed-tip", "설치됨 — 앱을 강제 종료하거나 강제 종료한 채 재부팅해도 원격이 다시 켜집니다(강제 종료 직후 되살리기는 도우미 입력 제어가 켜져 있을 때)."),
         ("wald-helper-missing-tip", "설치되지 않음 — 앱을 강제 종료한 채 재부팅하면 원격이 꺼진 채 남습니다."),
         ("wald-helper-update-tip", "이 앱에 더 새 도우미가 들어 있습니다. 업데이트합니다."),
         ("wald-helper-no-bundle-tip", "이 빌드에는 도우미 설치 파일이 없습니다. 어드민 '원격 설치 파일'에서 받아 설치합니다."),

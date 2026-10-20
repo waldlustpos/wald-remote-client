@@ -320,6 +320,7 @@ class MainService : Service() {
 
     override fun onDestroy() {
         checkMediaPermission()
+        WaldInputBridge.setMainServiceRunning(false) // Waldlust(DSK-02 2단계)
         stopService(Intent(this, FloatingWindowService::class.java))
         super.onDestroy()
     }
@@ -398,6 +399,8 @@ class MainService : Service() {
         super.onStartCommand(intent, flags, startId)
         if (intent?.action == ACT_INIT_MEDIA_PROJECTION_AND_SERVICE) {
             createForegroundNotification()
+            // Waldlust(DSK-02 2단계): 서비스가 켜진 채 이 앱이 강제 종료되면 도우미가 다시 깨운다
+            WaldInputBridge.setMainServiceRunning(true)
 
             if (intent.getBooleanExtra(EXT_INIT_FROM_BOOT, false)) {
                 // Waldlust(무인): 부팅 자동시작 시 루팅 박스라면 접근성(입력)·백그라운드 권한을
@@ -587,6 +590,7 @@ class MainService : Service() {
 
         mediaProjection = null
         checkMediaPermission()
+        WaldInputBridge.setMainServiceRunning(false) // Waldlust(DSK-02 2단계): 사용자가 멈췄다 — 도우미가 되살리지 않게
         stopForeground(true)
         stopService(Intent(this, FloatingWindowService::class.java))
         stopSelf()

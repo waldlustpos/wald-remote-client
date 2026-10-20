@@ -218,7 +218,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("wald-app-display-name", "Waldlust 원격지원"),
         ("wald-helper-card-title", "Auto recovery"),
         ("wald-helper-row", "Helper app"),
-        ("wald-helper-installed-tip", "Installed — remote access comes back even after a force stop and a reboot."),
+        ("wald-helper-installed-tip", "Installed — remote access comes back after a force stop, or a force stop and a reboot (right after a force stop only when helper input control is on)."),
         ("wald-helper-missing-tip", "Not installed — after a force stop and a reboot, remote access stays off."),
         ("wald-helper-update-tip", "This app contains a newer helper. Update it."),
         ("wald-helper-no-bundle-tip", "This build has no helper installer. Download it from 'Remote installers' in the admin."),

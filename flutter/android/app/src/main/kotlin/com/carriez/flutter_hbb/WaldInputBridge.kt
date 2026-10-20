@@ -61,6 +61,9 @@ object WaldInputBridge {
     // adb 권한이 있어 도우미 접근성을 켜야 하는데 아직 연결 전이다 — 연결되면 켠다.
     @Volatile
     private var pendingEnable = false
+    // 원격 서비스가 켜져 있다 — 도우미는 이 값이 true 일 때 이 앱이 죽으면 다시 깨운다(MainWatcher).
+    @Volatile
+    private var mainServiceRunning = false
 
     private var bound = false
     private var receiverRegistered = false
@@ -187,6 +190,7 @@ object WaldInputBridge {
                 ready = r.isInputConnected()
                 val left = armUntil - SystemClock.uptimeMillis()
                 if (left > 0) r.armProjectionAccept(left)
+                r.setMainServiceRunning(mainServiceRunning)
             } catch (e: Exception) {
                 // RemoteException·SecurityException(서명이 다른 도우미)
                 Log.w(logTag, "helper bridge setup failed: $e")
@@ -374,6 +378,17 @@ object WaldInputBridge {
         val r = remote ?: return // 연결되면 남은 시간으로 보낸다
         try {
             r.armProjectionAccept(durationMs)
+        } catch (e: RemoteException) {
+            markDead(e)
+        }
+    }
+
+    /** 원격 서비스가 켜졌다·멈췄다(MainService). 켜진 채 이 앱이 죽으면 도우미가 다시 깨운다 — 사용자가 멈춘 뒤에는 깨우지 않는다. */
+    fun setMainServiceRunning(running: Boolean) {
+        mainServiceRunning = running
+        val r = remote ?: return // 연결되면 보낸다
+        try {
+            r.setMainServiceRunning(running)
         } catch (e: RemoteException) {
             markDead(e)
         }
