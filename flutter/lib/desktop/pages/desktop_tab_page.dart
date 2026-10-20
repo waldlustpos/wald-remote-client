@@ -4,6 +4,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
+import 'package:flutter_hbb/desktop/widgets/wald_account_button.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
@@ -96,17 +97,22 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
             backgroundColor: Theme.of(context).colorScheme.background,
             body: DesktopTab(
               controller: tabController,
-              tail: Offstage(
-                offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
-                child: ActionIcon(
-                  message: 'Settings',
-                  icon: IconFont.menu,
-                  onTap: DesktopTabPage.onAddSetting,
-                  isClose: false,
-                  // Waldlust(DSK-07): 높인 앱바(40)에 맞춰 아이콘을 12 → 20 으로 키운다.
-                  iconSize: WaldSize.iconLg,
+              tail: Row(mainAxisSize: MainAxisSize.min, children: [
+                // Waldlust(DSK-03 — 부록 A-45): 설정 버튼 왼쪽에 로그인 상태 버튼(계정 기능이 켜진 양방향만).
+                if (!bind.isIncomingOnly() && !bind.isDisableAccount())
+                  const WaldAccountButton(),
+                Offstage(
+                  offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
+                  child: ActionIcon(
+                    message: 'Settings',
+                    icon: IconFont.menu,
+                    onTap: DesktopTabPage.onAddSetting,
+                    isClose: false,
+                    // Waldlust(DSK-07): 높인 앱바(40)에 맞춰 아이콘을 12 → 20 으로 키운다.
+                    iconSize: WaldSize.iconLg,
+                  ),
                 ),
-              ),
+              ]),
             )));
     return isMacOS || kUseCompatibleUiMode
         ? tabWidget
