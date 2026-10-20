@@ -23,10 +23,17 @@ public class BootReceiver extends BroadcastReceiver {
     // 메인 앱의 부팅 수신기(applicationId 와 Kotlin 네임스페이스가 달라 클래스는 전체 이름 — 결정 D35)
     static final String MAIN_BOOT_RECEIVER = "com.carriez.flutter_hbb.BootReceiver";
     static final String MAIN_WAKE_ACTION = "com.carriez.flutter_hbb.DEBUG_BOOT_COMPLETED";
+    // 메인 앱(1.5.5+)이 켜질 때 보낸다. 이 신호가 전달되는 것만으로 Android 가 이 앱의 stopped 상태를 푼다(아이콘이 없어
+    // 사람이 한 번 열 수 없다 — 결정 D40). 메인 앱을 다시 깨우지는 않는다(서로 부르는 고리가 생기지 않게).
+    static final String ACTION_ACTIVATE = "co.kr.waldlust.remote.helper.ACTIVATE";
 
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
+        if (ACTION_ACTIVATE.equals(action)) {
+            Log.d(TAG, "activated by main app");
+            return;
+        }
         if (!Intent.ACTION_BOOT_COMPLETED.equals(action)
                 && !"android.intent.action.QUICKBOOT_POWERON".equals(action)) {
             return;

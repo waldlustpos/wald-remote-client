@@ -20,6 +20,8 @@
     <!-- Waldlust(DSK-02): 설치자가 adb 로 한 번 허용해 두면(pm grant) 강제 종료로 꺼진 접근성(입력)을 앱이 다시 켠다 -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Waldlust(DSK-02 — 결정 D40): 앱 안에 넣어 둔 원격지원 도우미를 시스템 설치 창으로 설치한다 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <queries>
         <intent>
@@ -47,6 +49,11 @@
                 <action android:name="com.carriez.flutter_hbb.DEBUG_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Waldlust(DSK-02 — 결정 D40): 도우미 설치 세션 결과(WaldHelper.kt) -->
+        <receiver
+            android:name=".WaldHelperInstallReceiver"
+            android:exported="false" />
 
         <service
             android:name=".InputService"

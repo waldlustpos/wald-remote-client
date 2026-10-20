@@ -9,3 +9,6 @@ GeneratedPluginRegistrant.java
 # Remember to never publicly share your keystore.
 # See https://flutter.dev/docs/deployment/android#reference-the-keystore-from-the-app
 key.properties
+
+# Waldlust(DSK-02 — 결정 D40): 빌드 스크립트(build-android-local.sh)가 수신 전용 빌드 때 넣는 도우미 설치 파일
+app/src/main/assets/wald-helper.apk

@@ -8,34 +8,35 @@
         <package android:name="co.kr.waldlust.remote" />
     </queries>
 
+    <!-- 런처 아이콘은 없다(결정 D40 — AnyDesk 플러그인처럼). 런처 화면을 선언하지 않아 Android 10+ 의 '앱 정보' 대체 아이콘도 생기지 않는다.
+         설정 → 애플리케이션 목록에는 보인다. -->
     <application
         android:allowBackup="false"
         android:icon="@android:drawable/sym_def_app_icon"
         android:label="@string/app_name">
 
         <!-- 부팅 때 메인 앱을 깨운다. 메인 앱이 강제 종료돼 stopped 라도 이 앱은 따로라 부팅 신호를 받는다.
-             부팅 신호는 앱마다 차례로 전달돼, 기본 우선순위면 RK3568 키오스크에서 67초 늦게 받았다 → 메인 앱과 같은 1000. -->
+             부팅 신호는 앱마다 차례로 전달돼, 기본 우선순위면 RK3568 키오스크에서 67초 늦게 받았다 → 메인 앱과 같은 1000.
+             ACTIVATE 는 메인 앱(1.5.5+)이 켜질 때 보내 이 앱의 stopped 상태(새로 설치하면 stopped)를 푸는 신호다 — 받기만 한다. -->
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="co.kr.waldlust.remote.helper.ACTIVATE" />
             </intent-filter>
         </receiver>
 
-        <!-- 설치 뒤 한 번 실행해 이 앱의 stopped 상태를 푼다(설치자 1회 설정). 화면 없이 바로 닫힌다. -->
+        <!-- 메인 앱을 한 번 깨우고 바로 닫힌다(화면 없음). 아이콘이 없어 adb 로만 연다:
+             adb shell am start -n co.kr.waldlust.remote.helper/.WakeActivity
+             (메인 앱 1.5.4 이하에서 도우미 stopped 를 풀 때, 화면 공유가 빠진 기기를 되살릴 때) -->
         <activity
             android:name=".WakeActivity"
             android:exported="true"
             android:excludeFromRecents="true"
             android:noHistory="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 
 </manifest>

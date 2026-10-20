@@ -67,6 +67,8 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Waldlust(DSK-02 — 결정 D40): '출처를 알 수 없는 앱 설치'를 허용하고 돌아오면 도우미 설치를 이어 간다.
+        WaldHelper.resumePendingInstall(this)
         val inputPer = InputService.isOpen
         activity.runOnUiThread {
             flutterMethodChannel?.invokeMethod(
@@ -122,6 +124,8 @@ class MainActivity : FlutterActivity() {
         }
         // Waldlust(DSK-02): 강제 종료로 꺼진 접근성(입력)을 앱을 열 때 다시 켠다(adb 로 허용해 둔 기기만).
         RootUtil.enableInputServiceIfPermitted(this)
+        // Waldlust(DSK-02 — 결정 D40): 아이콘 없는 도우미는 사람이 열 수 없으니 이 앱이 켜질 때 stopped 를 풀어 준다.
+        WaldHelper.activateIfStopped(this)
     }
 
     override fun onDestroy() {
@@ -180,6 +184,13 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     result.success(start)
+                }
+                // Waldlust(DSK-02 — 결정 D40): 홈 '자동 복구' 카드 — 도우미 상태와 앱 안 설치 파일로 설치.
+                "wald_helper_status" -> {
+                    result.success(WaldHelper.status(this@MainActivity))
+                }
+                "wald_helper_install" -> {
+                    result.success(WaldHelper.install(this@MainActivity))
                 }
                 "start_capture" -> {
                     mainService?.let {

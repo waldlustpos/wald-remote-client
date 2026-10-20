@@ -13,6 +13,7 @@ import '../../common/widgets/dialog.dart';
 import '../../consts.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
+import '../widgets/wald_helper_card.dart';
 import 'home_page.dart';
 
 class ServerPage extends StatefulWidget implements PageShape {
@@ -215,6 +216,9 @@ class _ServerPageState extends State<ServerPage> {
                             : ServiceNotRunningNotification(),
                         const ConnectionManager(),
                         const PermissionChecker(),
+                        // Waldlust(DSK-02 — 결정 D40): 도우미 앱·adb 1회 설정 상태와 도우미 설치.
+                        if (isAndroid && bind.isIncomingOnly())
+                          const WaldHelperCard(),
                         // Waldlust(D35): 수신 전용은 설정 탭이 없어 오픈소스 고지 링크를 여기 둔다.
                         if (bind.isIncomingOnly()) loadPowered(context),
                         SizedBox.fromSize(size: const Size(0, 15.0)),
@@ -956,6 +960,18 @@ void androidChannelInit() {
             if (gFFI.serverModel.isStart) {
               gFFI.serverModel.stopService();
             }
+            break;
+          }
+        // Waldlust(DSK-02 — 결정 D40): 도우미 설치 결과(WaldHelper.kt) — 홈 '자동 복구' 카드를 다시 읽는다.
+        case "wald_helper_changed":
+          {
+            final event = arguments["event"] as String;
+            if (event == "installed") {
+              showToast(translate("wald-helper-installed-toast"));
+            } else if (event == "failed") {
+              showToast(translate("wald-helper-install-failed-tip"));
+            }
+            waldHelperChanged.value++;
             break;
           }
       }
