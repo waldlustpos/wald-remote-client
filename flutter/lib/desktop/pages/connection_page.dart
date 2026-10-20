@@ -2,12 +2,10 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/consts.dart';
-import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
@@ -18,7 +16,6 @@ import '../../common/formatter/id_formatter.dart';
 import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
-import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 
 class OnlineStatusWidget extends StatefulWidget {
   const OnlineStatusWidget({Key? key, this.onSvcStatusChanged})
@@ -174,8 +171,6 @@ class _ConnectionPageState extends State<ConnectionPage>
 
   // https://github.com/flutter/flutter/issues/157244
   Iterable<Peer> _autocompleteOpts = [];
-
-  final _menuOpen = false.obs;
 
   @override
   void initState() {
@@ -477,95 +472,30 @@ class _ConnectionPageState extends State<ConnectionPage>
             Padding(
               padding: const EdgeInsets.only(top: 13.0),
               child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                // Waldlust(DSK-07): 높이 32(테마 버튼과 같게), 라벨 줄 상자 고정, 옆 메뉴는 보조 버튼 테두리.
+                // Waldlust(DSK-07): 높이 32(테마 버튼과 같게), 라벨 줄 상자 고정.
+                // 부록 A-48: 두 버튼에 카드 버튼과 같은 아이콘을 달고, 업스트림 더보기 메뉴(파일 전송·카메라 보기·
+                // 터미널)는 없앤 뒤 파일 전송만 보조 버튼으로 꺼냈다.
                 SizedBox(
                   height: WaldSize.buttonHeight,
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     onPressed: () {
                       onConnect();
                     },
-                    child: Text(translate("Connect"),
+                    icon: Icon(waldIcon(Icons.screen_share_outlined)),
+                    label: Text(translate("Connect"),
                         strutStyle: waldButtonStrut()),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
+                SizedBox(
                   height: WaldSize.buttonHeight,
-                  width: WaldSize.buttonHeight,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: WaldColors.of(context).secondaryBorder),
-                    borderRadius: BorderRadius.circular(WaldSize.radius),
-                  ),
-                  child: Center(
-                    child: StatefulBuilder(
-                      builder: (context, setState) {
-                        var offset = Offset(0, 0);
-                        return Obx(() => InkWell(
-                              child: _menuOpen.value
-                                  ? Transform.rotate(
-                                      angle: pi,
-                                      child: Icon(IconFont.more, size: 14),
-                                    )
-                                  : Icon(IconFont.more, size: 14),
-                              onTapDown: (e) {
-                                offset = e.globalPosition;
-                              },
-                              onTap: () async {
-                                _menuOpen.value = true;
-                                final x = offset.dx;
-                                final y = offset.dy;
-                                await mod_menu
-                                    .showMenu(
-                                  context: context,
-                                  position: RelativeRect.fromLTRB(x, y, x, y),
-                                  items: [
-                                    (
-                                      'Transfer file',
-                                      () => onConnect(isFileTransfer: true)
-                                    ),
-                                    (
-                                      'View camera',
-                                      () => onConnect(isViewCamera: true)
-                                    ),
-                                    (
-                                      '${translate('Terminal')} (beta)',
-                                      () => onConnect(isTerminal: true)
-                                    ),
-                                  ]
-                                      .map((e) => MenuEntryButton<String>(
-                                            childBuilder: (TextStyle? style) =>
-                                                Text(
-                                              translate(e.$1),
-                                              style: style,
-                                            ),
-                                            proc: () => e.$2(),
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal:
-                                                    kDesktopMenuPadding.left),
-                                            dismissOnClicked: true,
-                                          ))
-                                      .map((e) => e.build(
-                                          context,
-                                          const MenuConfig(
-                                              commonColor: CustomPopupMenuTheme
-                                                  .commonColor,
-                                              height:
-                                                  CustomPopupMenuTheme.height,
-                                              dividerHeight:
-                                                  CustomPopupMenuTheme
-                                                      .dividerHeight)))
-                                      .expand((i) => i)
-                                      .toList(),
-                                  elevation: 8,
-                                )
-                                    .then((_) {
-                                  _menuOpen.value = false;
-                                });
-                              },
-                            ));
-                      },
-                    ),
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      onConnect(isFileTransfer: true);
+                    },
+                    icon: Icon(waldIcon(Icons.folder_outlined)),
+                    label: Text(translate('Transfer file'),
+                        strutStyle: waldButtonStrut()),
                   ),
                 ),
               ]),
