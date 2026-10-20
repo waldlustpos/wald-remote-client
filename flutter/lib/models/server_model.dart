@@ -15,6 +15,7 @@ import '../common/formatter/id_formatter.dart';
 import '../desktop/pages/server_page.dart' as desktop;
 import '../desktop/widgets/tabbar_widget.dart';
 import '../mobile/pages/server_page.dart';
+import '../mobile/widgets/wald_helper_card.dart' show waldHelperInputCapable;
 import 'model.dart';
 
 const kLoginDialogTag = "LOGIN";
@@ -921,7 +922,10 @@ showInputWarnAlert(FFI ffi) {
         children: [
           Text(translate("android_input_permission_tip1")),
           const SizedBox(height: 10),
-          Text(translate("android_input_permission_tip2")),
+          // Waldlust(DSK-02 2단계): 도우미에 입력 제어가 있으면 도우미 항목을 켜라고 안내한다
+          Text(translate(waldHelperInputCapable
+              ? "wald-helper-input-guide-tip"
+              : "android_input_permission_tip2")),
         ],
       ),
       actions: [

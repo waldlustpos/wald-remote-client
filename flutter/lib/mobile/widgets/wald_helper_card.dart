@@ -4,11 +4,14 @@
 //   앱을 연 동안 한 번 설치를 권한다.
 // - adb 1회 설정: 강제 종료 뒤 입력 제어(접근성)를 다시 켜는 권한(WRITE_SECURE_SETTINGS — 결정 D38). 앱이 스스로 얻을 수 없어
 //   명령을 보여 준다.
+// - 입력 제어(도우미) — 2단계(결정 D41): 도우미 접근성이 켜져 있으면 앱을 강제 종료해도 입력 제어가 남아 adb 1회 설정이 필요 없다.
+//   도우미에 그 기능이 있으면 줄을 보이고, 켜져 있으면 adb 줄은 숨긴다.
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 import '../../common.dart';
+import '../../consts.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import '../pages/server_page.dart' show PaddingCard;
@@ -22,14 +25,22 @@ const kWaldAdbGrantCommand =
 /// 앱을 연 동안(프로세스) 한 번만 설치를 권한다.
 bool _waldHelperPrompted = false;
 
+/// 앱을 연 동안(프로세스) 한 번만 도우미 입력 제어를 켜라고 권한다.
+bool _waldHelperInputPrompted = false;
+
+/// 도우미에 입력 제어 기능이 있다(마지막으로 읽은 값) — 입력 제어 안내(server_model.dart showInputWarnAlert)가 도우미 항목을 가리킨다.
+bool waldHelperInputCapable = false;
+
 class _WaldHelperStatus {
   final bool installed;
   final bool hasBundle;
   final bool needsUpdate;
   final bool adbGranted;
+  final bool inputCapable;
+  final bool inputOn;
 
-  const _WaldHelperStatus(
-      this.installed, this.hasBundle, this.needsUpdate, this.adbGranted);
+  const _WaldHelperStatus(this.installed, this.hasBundle, this.needsUpdate,
+      this.adbGranted, this.inputCapable, this.inputOn);
 
   bool get helperOk => installed && !needsUpdate;
 
@@ -37,8 +48,14 @@ class _WaldHelperStatus {
     try {
       final m = await platformFFI.invokeMethod('wald_helper_status');
       if (m is! Map) return null;
-      return _WaldHelperStatus(m['installed'] == true, m['hasBundle'] == true,
-          m['needsUpdate'] == true, m['adbGranted'] == true);
+      waldHelperInputCapable = m['inputCapable'] == true;
+      return _WaldHelperStatus(
+          m['installed'] == true,
+          m['hasBundle'] == true,
+          m['needsUpdate'] == true,
+          m['adbGranted'] == true,
+          m['inputCapable'] == true,
+          m['inputOn'] == true);
     } catch (e) {
       debugPrint('wald_helper_status: $e');
       return null;
@@ -103,12 +120,46 @@ class _WaldHelperCardState extends State<WaldHelperCard>
     if (r != 'started') setState(() => _busy = false);
   }
 
+  void _openAccessibilitySettings() {
+    AndroidPermissionManager.startAction(kActionAccessibilitySettings);
+  }
+
+  // 도우미가 최신인데 도우미 입력 제어가 꺼져 있고 adb 설정도 없으면 한 번 켜라고 권한다(adb 가 있으면 앱이 켠다).
+  void _maybePromptInput(_WaldHelperStatus status, bool serviceRunning) {
+    if (_waldHelperInputPrompted ||
+        !serviceRunning ||
+        !status.helperOk ||
+        !status.inputCapable ||
+        status.inputOn ||
+        status.adbGranted) {
+      return;
+    }
+    _waldHelperInputPrompted = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      gFFI.dialogManager.show((setState, close, context) => CustomAlertDialog(
+            title: Text(translate('wald-helper-input-prompt-title')),
+            content: Text(translate('wald-helper-input-prompt-tip')),
+            actions: [
+              dialogButton('wald-helper-later',
+                  onPressed: close, isOutline: true),
+              dialogButton('wald-helper-input-open', onPressed: () {
+                close();
+                _openAccessibilitySettings();
+              }),
+            ],
+            onCancel: close,
+          ));
+    });
+  }
+
   // 서비스가 켜진 뒤(첫 설치의 권한·서비스 시작과 겹치지 않게) 한 번 권한다.
   void _maybePrompt(_WaldHelperStatus status, bool serviceRunning) {
     if (_waldHelperPrompted ||
         !serviceRunning ||
         !status.hasBundle ||
         status.helperOk) {
+      _maybePromptInput(status, serviceRunning);
       return;
     }
     _waldHelperPrompted = true;
@@ -188,17 +239,37 @@ class _WaldHelperCardState extends State<WaldHelperCard>
                         strutStyle: waldButtonStrut()))
                 : null,
           ),
-          const SizedBox(height: 14),
-          _row(
-            ok: status.adbGranted,
-            title: translate('wald-adb-row'),
-            tip: translate(
-                status.adbGranted ? 'wald-adb-ok-tip' : 'wald-adb-missing-tip'),
-            extra: status.adbGranted
-                ? null
-                : const SelectableText(kWaldAdbGrantCommand,
-                    style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
-          ),
+          if (status.installed && status.inputCapable) ...[
+            const SizedBox(height: 14),
+            _row(
+              ok: status.inputOn,
+              title: translate('wald-helper-input-row'),
+              tip: translate(status.inputOn
+                  ? 'wald-helper-input-on-tip'
+                  : 'wald-helper-input-off-tip'),
+              action: status.inputOn
+                  ? null
+                  : ElevatedButton.icon(
+                      icon: Icon(waldIcon(Icons.settings)),
+                      onPressed: _openAccessibilitySettings,
+                      label: Text(translate('wald-helper-input-open'),
+                          strutStyle: waldButtonStrut())),
+            ),
+          ],
+          if (!(status.inputCapable && status.inputOn)) ...[
+            const SizedBox(height: 14),
+            _row(
+              ok: status.adbGranted,
+              title: translate('wald-adb-row'),
+              tip: translate(status.adbGranted
+                  ? 'wald-adb-ok-tip'
+                  : 'wald-adb-missing-tip'),
+              extra: status.adbGranted
+                  ? null
+                  : const SelectableText(kWaldAdbGrantCommand,
+                      style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            ),
+          ],
         ]));
   }
 }
