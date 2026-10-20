@@ -730,14 +730,30 @@ class InputService : AccessibilityService() {
         if (!autoAcceptProjection) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
             event.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
+        tryAutoAcceptProjection()
+    }
+
+    private fun tryAutoAcceptProjection() {
+        if (!autoAcceptProjection) return
         // MediaProjection 동의 팝업은 시스템UI/android 패키지에 뜬다. 다른 앱 팝업 오클릭 방지.
         // OEM(SUNMI 등) 커스텀 ROM 은 systemui 파생 패키지일 수 있어 substring 으로 매칭.
-        val pkg = event.packageName?.toString() ?: ""
-        if (!pkg.contains("systemui") && pkg != "android" && !pkg.contains("mediaprojection")) return
-        val root = rootInActiveWindow ?: return
+        // 패키지는 이벤트가 아닌 활성 창에서 본다(DSK-02): 창 변경 이벤트(TYPE_WINDOWS_CHANGED)에는 패키지가 없어
+        // 이벤트 패키지로 거르면 창 상태 이벤트 때 활성 창이 아직 팝업이 아닐 때 팝업을 놓친다.
+        val root = rootInActiveWindow
+        if (root == null) {
+            Log.d(logTag, "auto-accept: no active window")
+            return
+        }
+        val pkg = root.packageName?.toString() ?: ""
+        if (!pkg.contains("systemui") && pkg != "android" && !pkg.contains("mediaprojection")) {
+            Log.d(logTag, "auto-accept: skip window $pkg")
+            return
+        }
         if (tryClickProjectionAccept(root)) {
             autoAcceptProjection = false
             Log.d(logTag, "auto-accepted screen projection dialog")
+        } else {
+            Log.d(logTag, "auto-accept: accept button not clicked in $pkg (childCount=${root.childCount})")
         }
     }
 
@@ -765,7 +781,9 @@ class InputService : AccessibilityService() {
         var hops = 0
         while (c != null && hops < 6) {
             if (c.isClickable) {
-                return c.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                val ok = c.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                if (!ok) Log.d(logTag, "auto-accept: click refused on ${c.viewIdResourceName ?: c.text}")
+                return ok
             }
             c = c.parent
             hops++
@@ -787,6 +805,8 @@ class InputService : AccessibilityService() {
         // (기본 serviceInfo 는 eventTypes=0 이라 onAccessibilityEvent 가 호출되지 않음)
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
             AccessibilityEvent.TYPE_WINDOWS_CHANGED
+        // Waldlust(DSK-02): Android 7 은 feedbackType 이 0 인 서비스에 이벤트를 보내지 않는다(T2 mini 에서 확인).
+        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
         setServiceInfo(info)
         fakeEditTextForTextStateCalculation = EditText(this)
         // Size here doesn't matter, we won't show this view.
@@ -795,6 +815,14 @@ class InputService : AccessibilityService() {
         val layout = fakeEditTextForTextStateCalculation?.getLayout()
         Log.d(logTag, "fakeEditTextForTextStateCalculation layout:$layout")
         Log.d(logTag, "onServiceConnected!")
+        // Waldlust(DSK-02): 강제 종료 뒤 앱을 열 때 접근성을 다시 켜면 이 서비스가 동의 팝업보다 늦게 연결돼
+        // 팝업 이벤트를 놓친다(D2s, Android 11). 연결 직후 몇 번 이미 떠 있는 팝업을 찾아 승인한다.
+        if (autoAcceptProjection) {
+            val handler = Handler(Looper.getMainLooper())
+            for (delayMs in longArrayOf(0L, 500L, 1500L, 3000L)) {
+                handler.postDelayed({ tryAutoAcceptProjection() }, delayMs)
+            }
+        }
     }
 
     override fun onDestroy() {

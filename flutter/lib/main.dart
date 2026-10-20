@@ -183,6 +183,10 @@ void runMobileApp() async {
   checkUpdate();
   if (isAndroid) androidChannelInit();
   if (isAndroid) platformFFI.syncAndroidServiceAppDirConfigPath();
+  // Waldlust(DSK-02): 수신 전용은 앱을 열 때 서비스가 꺼져 있으면(강제 종료 뒤 등) 켠다.
+  if (isAndroid && bind.isIncomingOnly()) {
+    gFFI.invokeMethod("wald_auto_start_service");
+  }
   draggablePositions.load();
   await Future.wait([gFFI.abModel.loadCache(), gFFI.groupModel.loadCache()]);
   gFFI.userModel.refreshCurrentUser();

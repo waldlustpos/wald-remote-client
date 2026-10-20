@@ -1,7 +1,9 @@
+<!-- Waldlust(DSK-02): isAccessibilityTool — Android 14 는 화면 공유 동의 팝업의 버튼을 접근성 도구에만 보여 줘서 자동 승인에 필요하다 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowsChanged"
     android:canRetrieveWindowContent="true"
     android:accessibilityFlags="flagDefault"
     android:notificationTimeout="50"
     android:description="@string/accessibility_service_description"
-    android:canPerformGestures="true"/>
+    android:canPerformGestures="true"
+    android:isAccessibilityTool="true"/>

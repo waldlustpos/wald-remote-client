@@ -1,6 +1,15 @@
 package com.carriez.flutter_hbb
 
+import android.Manifest.permission.WRITE_SECURE_SETTINGS
+import android.content.ComponentName
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
+import androidx.core.content.ContextCompat
 
 /**
  * Waldlust: 루팅된 무인 키오스크에서 "켜면 자동으로 원격이 되는" 것을 위한 root 헬퍼.
@@ -28,6 +37,57 @@ object RootUtil {
         } catch (e: Exception) {
             Log.w(logTag, "root unavailable or cmd failed: $cmd (${e.message})")
             null
+        }
+    }
+
+    /**
+     * Waldlust(DSK-02): root 없이 접근성(입력)을 켠다. 앱을 강제 종료하면 시스템이 접근성 목록에서 이 앱을 지우므로
+     * 앱을 열 때·화면공유를 요청할 때 다시 켠다. 설치자가 adb 로 한 번 허용해 둔 기기에서만 된다:
+     * `adb shell pm grant <패키지> android.permission.WRITE_SECURE_SETTINGS`(앱을 지우기 전까지 유지).
+     * 권한이 없으면 아무것도 하지 않는다(설치자 수동 활성화 그대로). 켰으면(이미 켜져 있었으면) true.
+     */
+    fun enableInputServiceIfPermitted(context: Context): Boolean {
+        if (ContextCompat.checkSelfPermission(context, WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
+            return false
+        }
+        if (InputService.isOpen) return true
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastEnableMs < 3_000L) return true // 앱 시작·서비스 시작이 겹쳐 불려도 한 번만
+        lastEnableMs = now
+        val app = context.applicationContext
+        if (!putInputServiceEnabled(app, true)) return false
+        // Android 11 은 강제 종료된 접근성 서비스를 '충돌'로 기록해 목록에 다시 넣어도 바인드하지 않는다(D2s).
+        // 곧 연결되지 않으면 목록에서 뺐다가 다시 넣어 그 기록을 지운다.
+        val handler = Handler(Looper.getMainLooper())
+        handler.postDelayed({
+            if (!InputService.isOpen) {
+                Log.d(logTag, "accessibility not bound, toggling off and on")
+                putInputServiceEnabled(app, false)
+                handler.postDelayed({ putInputServiceEnabled(app, true) }, 500)
+            }
+        }, 1_500)
+        return true
+    }
+
+    @Volatile
+    private var lastEnableMs = 0L
+
+    private fun putInputServiceEnabled(context: Context, enabled: Boolean): Boolean {
+        return try {
+            val service = ComponentName(context, InputService::class.java).flattenToString()
+            val resolver = context.contentResolver
+            val current = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+            val others = current.split(':').filter { it.isNotBlank() && !it.equals(service, ignoreCase = true) }
+            val merged = (if (enabled) others + service else others).joinToString(":")
+            if (merged != current) {
+                Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, merged)
+                Log.d(logTag, "accessibility ${if (enabled) "re-enabled" else "disabled"} via WRITE_SECURE_SETTINGS")
+            }
+            if (enabled) Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+            true
+        } catch (e: Exception) {
+            Log.w(logTag, "set accessibility failed: ${e.message}")
+            false
         }
     }
 

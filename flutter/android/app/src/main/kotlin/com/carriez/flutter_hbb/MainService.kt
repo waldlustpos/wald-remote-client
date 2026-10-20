@@ -438,6 +438,7 @@ class MainService : Service() {
         // 접근성이 아직 안 켜져 있으면(루팅) root 로 켜서 InputService 가 팝업을 클릭할 수 있게 한다.
         InputService.autoAcceptProjection = true
         if (!InputService.isOpen) {
+            RootUtil.enableInputServiceIfPermitted(this)
             Thread { RootUtil.ensureUnattendedGrants(packageName) }.start()
         }
         // 안전장치: 20초 안에 승인되지 않으면 자동승인 플래그를 해제(엉뚱한 팝업 오클릭 방지).

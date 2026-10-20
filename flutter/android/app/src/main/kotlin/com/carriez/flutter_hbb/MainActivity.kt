@@ -120,6 +120,8 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             Log.w(logTag, "auto request unattended perms failed: ${e.message}")
         }
+        // Waldlust(DSK-02): 강제 종료로 꺼진 접근성(입력)을 앱을 열 때 다시 켠다(adb 로 허용해 둔 기기만).
+        RootUtil.enableInputServiceIfPermitted(this)
     }
 
     override fun onDestroy() {
@@ -157,6 +159,27 @@ class MainActivity : FlutterActivity() {
                     }
                     requestMediaProjection()
                     result.success(true)
+                }
+                "wald_auto_start_service" -> {
+                    // Waldlust(DSK-02): 수신 전용은 앱을 열 때 서비스가 꺼져 있으면(강제 종료 뒤 등) 부팅 때와 같은 경로로 켠다.
+                    // 설치자 1회 설정(배터리 최적화 예외·오버레이)이 끝난 기기만 — 첫 실행의 권한 요청과 겹치지 않게 한다.
+                    val start = !MainService.isReady && XXPermissions.isGranted(
+                        context,
+                        android.Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        android.Manifest.permission.SYSTEM_ALERT_WINDOW
+                    )
+                    if (start) {
+                        val serviceIntent = Intent(context, MainService::class.java).apply {
+                            action = ACT_INIT_MEDIA_PROJECTION_AND_SERVICE
+                            putExtra(EXT_INIT_FROM_BOOT, true)
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(serviceIntent)
+                        } else {
+                            startService(serviceIntent)
+                        }
+                    }
+                    result.success(start)
                 }
                 "start_capture" -> {
                     mainService?.let {
