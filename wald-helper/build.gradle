@@ -1,0 +1,18 @@
+// Waldlust 원격지원 도우미(부록 A-44 1단계): 메인 앱과 따로 빌드한다 — Flutter·cargo 없이 이 폴더에서
+// ./gradlew :app:assembleDebug(로컬 시험, ~/.android/debug.keystore — 메인 로컬 빌드와 같은 키).
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}

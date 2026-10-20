@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- 메인 앱(co.kr.waldlust.remote)을 깨우려면 그 패키지가 보여야 한다(Android 11+ 패키지 가시성) -->
+    <queries>
+        <package android:name="co.kr.waldlust.remote" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="@string/app_name">
+
+        <!-- 부팅 때 메인 앱을 깨운다. 메인 앱이 강제 종료돼 stopped 라도 이 앱은 따로라 부팅 신호를 받는다.
+             부팅 신호는 앱마다 차례로 전달돼, 기본 우선순위면 RK3568 키오스크에서 67초 늦게 받았다 → 메인 앱과 같은 1000. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 설치 뒤 한 번 실행해 이 앱의 stopped 상태를 푼다(설치자 1회 설정). 화면 없이 바로 닫힌다. -->
+        <activity
+            android:name=".WakeActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
