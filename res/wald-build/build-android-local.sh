@@ -7,7 +7,8 @@
 # 결과:  ~/wald-build/waldlust-<버전>-android-localtest[-incoming].apk(prodtest 는 -android-prodtest), 로그는 ~/wald-build/logs/
 #        + ~/wald-build/dist/<버전>-<sha9>-<대상>/waldlust-remote[-incoming]-<버전>-android[-<대상>].apk 와 manifest-android-<변형>.txt
 #        (설치 파일 이름 규칙 — 결정 D36: release 는 '-<대상>' 을 붙이지 않는다. 예 waldlust-remote-incoming-1.5.0-android.apk)
-#        수신 전용이면 도우미 앱(wald-helper — 부록 A-44, 결정 D39)도 같은 버전·같은 서명으로 만든다:
+#        수신 전용이면 도우미 앱(wald-helper — 부록 A-44, 결정 D39·D40)도 같은 버전·같은 서명으로 먼저 만들어 메인 APK 의
+#        assets/wald-helper.apk 로 넣고(앱이 설치한다 — D40), 따로도 남긴다:
 #        dist 의 waldlust-remote-helper-<버전>-android[-<대상>].apk 와 manifest-android-helper.txt. wald-helper 가 없는 옛 ref 는 건너뛴다.
 #
 # 원칙
@@ -183,10 +184,30 @@ rm -rf "$VCPKG_ROOT/installed/arm-android/arm-neon-android"
 step deps-armv7; ./flutter/build_android_deps.sh armeabi-v7a > "$LOG/deps-armv7.log" 2>&1 || die deps-armv7
 step rust-armv7; ./flutter/ndk_arm.sh                        > "$LOG/rust-armv7.log" 2>&1 || die rust-armv7
 
+# 2b) 수신 전용: 도우미 앱(wald-helper — 부록 A-44 1단계, 결정 D39·D40). 메인 앱과 같은 버전(정식은 태그의 versionCode)·같은 서명
+#     (release = 릴리즈 키, 그 밖 = debug 키)으로 메인 APK 보다 먼저 만들어 메인 APK 의 assets/wald-helper.apk 로 넣는다(앱이 도우미를
+#     설치한다 — D40). Flutter·Rust 없이 Gradle 만 쓴다. wald-helper 가 없는 옛 ref 는 건너뛴다.
+export JAVA_HOME="$(/usr/libexec/java_home -v 17)"
+VER=$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
+HAPK=""
+if [ "$VARIANT" = incoming ] && [ -d wald-helper ]; then
+  step helper
+  HVCODE="${VCODE:-$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f2)}"
+  echo "sdk.dir=$HOME/Library/Android/sdk" > wald-helper/local.properties
+  [ "$TARGET" != release ] || cp "$KEYS/android-release.properties" wald-helper/key.properties || die "도우미 키 설정 복사"
+  ( cd wald-helper && ./gradlew --no-daemon -q :app:assembleRelease -PwaldVersionCode="$HVCODE" -PwaldVersionName="$VER"
+  ) > "$LOG/helper.log" 2>&1; hrc=$?
+  rm -f wald-helper/key.properties   # release 에서 복사한 키 설정
+  [ $hrc -eq 0 ] || die helper
+  HAPK="$OUT/waldlust-$VER-android-$KIND-helper.apk"
+  cp wald-helper/app/build/outputs/apk/release/app-release.apk "$HAPK" || die "도우미 APK 복사"
+  mkdir -p flutter/android/app/src/main/assets
+  cp "$HAPK" flutter/android/app/src/main/assets/wald-helper.apk || die "도우미를 메인 앱 assets 에 넣기"   # git 제외 파일(flutter/android/.gitignore)
+fi
+
 # 3) APK(Flutter 3.24.5). macOS: libc++_shared 는 darwin-x86_64 경로에서 가져오고, Gradle 7.6.4 는 JDK 17 로 고정한다.
 #    Flutter 가 JAVA_HOME 보다 Android Studio JBR(21)을 우선하므로 worktree 의 gradle.properties 로 지정한다(전역 flutter config 는 건드리지 않는다).
 step apk
-export JAVA_HOME="$(/usr/libexec/java_home -v 17)"
 J=flutter/android/app/src/main/jniLibs; L="$NDKSYS/usr/lib"
 mkdir -p "$J/arm64-v8a" "$J/armeabi-v7a"
 cp "$L/aarch64-linux-android/libc++_shared.so" "$J/arm64-v8a/" || die "libc++ arm64"
@@ -210,21 +231,6 @@ VER=$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
 APK="$OUT/waldlust-$VER-android-$KIND$SUFFIX.apk"
 cp flutter/build/app/outputs/flutter-apk/app-release.apk "$APK" || die "APK 복사"
 
-# 3b) 수신 전용: 도우미 앱(wald-helper — 부록 A-44 1단계, 결정 D39). 메인 앱과 같은 버전(정식은 태그의 versionCode)·같은 서명
-#     (release = 릴리즈 키, 그 밖 = debug 키)으로 만든다. Flutter·Rust 없이 Gradle 만 쓴다. wald-helper 가 없는 옛 ref 는 건너뛴다.
-HAPK=""
-if [ "$VARIANT" = incoming ] && [ -d wald-helper ]; then
-  step helper
-  HVCODE="${VCODE:-$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f2)}"
-  echo "sdk.dir=$HOME/Library/Android/sdk" > wald-helper/local.properties
-  [ "$TARGET" != release ] || cp "$KEYS/android-release.properties" wald-helper/key.properties || die "도우미 키 설정 복사"
-  ( cd wald-helper && ./gradlew --no-daemon -q :app:assembleRelease -PwaldVersionCode="$HVCODE" -PwaldVersionName="$VER"
-  ) > "$LOG/helper.log" 2>&1; hrc=$?
-  rm -f wald-helper/key.properties   # release 에서 복사한 키 설정
-  [ $hrc -eq 0 ] || die helper
-  HAPK="$OUT/waldlust-$VER-android-$KIND-helper.apk"
-  cp wald-helper/app/build/outputs/apk/release/app-release.apk "$HAPK" || die "도우미 APK 복사"
-fi
 
 # 4) 확인: 정체·ABI·서명, ABI 마다 heartbeat 주소(기대값 1 이상, 운영 0 — prodtest 는 기대값이 곧 운영)와 API 서버를 넣었으면 그 값(1 이상).
 step verify
@@ -262,6 +268,21 @@ if [ -n "$HAPK" ]; then
   [ -n "$HSIGNER" ] && [ "$HSIGNER" = "$SIGNER" ] || die "도우미 서명이 메인 앱과 다르다 — 이 APK 는 배포하지 않는다"
   echo "$HPKG_LINE" | grep -q "name='co.kr.waldlust.remote.helper'" || die "도우미 패키지가 co.kr.waldlust.remote.helper 가 아니다"
   echo "$HPKG_LINE" | grep -q "versionCode='$HVCODE'" || die "도우미 versionCode 가 $HVCODE 가 아니다"
+  # 2단계(부록 A-44, 결정 D41): 도우미가 입력 제어(접근성)·입력 브리지를 갖췄는지, 메인 앱이 브리지 서명 권한을 쓰는지.
+  # 1단계 도우미(옛 ref)는 브리지가 없다 — 그때는 표시만 한다.
+  HXML=$("$BT/aapt2" dump xmltree --file AndroidManifest.xml "$HAPK")
+  if echo "$HXML" | grep -q 'co.kr.waldlust.remote.helper.INPUT_BRIDGE'; then
+    echo "$HXML" | grep -q 'android.accessibilityservice' || die "도우미에 입력 브리지는 있는데 접근성 서비스가 없다"
+    "$BT/aapt2" dump permissions "$APK" | grep -q 'co.kr.waldlust.remote.permission.INPUT_BRIDGE' \
+      || die "메인 앱이 도우미 입력 브리지 권한(INPUT_BRIDGE)을 쓰지 않는다"
+    echo "helper input control: accessibility + INPUT_BRIDGE"
+  else
+    echo "helper input control: none (stage-1 helper)"
+  fi
+  # 메인 APK 안 사본(assets/wald-helper.apk — 앱이 설치하는 것, D40)이 이 도우미와 같은 파일인지
+  [ "$(unzip -p "$APK" assets/wald-helper.apk | shasum -a 256 | awk '{print $1}')" = "$(shasum -a 256 "$HAPK" | awk '{print $1}')" ] \
+    || die "메인 APK 의 assets/wald-helper.apk 가 도우미 APK 와 다르다"
+  echo "helper bundled in main APK: assets/wald-helper.apk"
   echo "done: $HAPK"
 fi
 
