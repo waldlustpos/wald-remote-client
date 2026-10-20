@@ -3,7 +3,7 @@
 These are the scripts that produce the official Waldlust Remote binaries (decisions D33–D35, 2026-10-14).
 They are part of the Corresponding Source of every release under the GNU AGPL-3.0 (§1: "scripts to control
 those activities"). The working copies live in the private docs repository (`wald-remote-docs/wald-build`);
-a snapshot is committed here for each release tag (this snapshot: docs commit 89cc7e9).
+a snapshot is committed here for each release tag (this snapshot: docs commit 2bf7006).
 
 | Script | Output |
 |---|---|

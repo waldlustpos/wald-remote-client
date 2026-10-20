@@ -27,6 +27,8 @@
 #          서명 지문은 ~/wald-build/keys/android-release.sha256 과 같아야 한다. versionCode 는 태그에서 계산한다(D36):
 #          M×1,000,000 + m×10,000 + p×100 + r — wald-v1.5.0-r1 = 1050001(옛 규칙 2100+r 의 r3 = 2103 보다 크다).
 #          WALD_VERSION_CODE 를 주면 계산값과 같아야 한다. 패키지 = co.kr.waldlust.remote(D35).
+#          같은 버전 재게시(배포 공지 전 사내 시험 단계만 — 2026-10-20 사용자, 부록 A-44): WALD_REUSE_VCODE_OF=<같은 버전의 앞 태그>
+#          (예 wald-v1.5.3-r1)를 주면 그 태그의 versionCode 를 그대로 쓴다. 이미 깐 기기는 같은 versionCode 라 덮어 설치된다.
 #          dist 에 NOTICE·LICENCE·THIRD_PARTY_NOTICES-android.txt.
 #          cargo-about 0.6.4(cargo install cargo-about --version 0.6.4 --locked)가 있어야 한다.
 # - 수신 전용(DSK-01): ~/wald-build/incoming-test.env(git 밖, 권한 600)의 테스트 비밀번호·솔트
@@ -101,6 +103,14 @@ if [ "$TARGET" = release ]; then
   [ -f "$KEYS/android-release.properties" ] && [ -s "$KEYS/android-release.sha256" ] || die "릴리즈 키가 없다($KEYS — make-android-release-key.sh)"
   TAG_VER=${${BASE#wald-v}%-r*}; TAG_PARTS=(${(s:.:)TAG_VER}); TAG_R=${BASE##*-r}
   VCODE=$(( TAG_PARTS[1]*1000000 + TAG_PARTS[2]*10000 + TAG_PARTS[3]*100 + TAG_R ))   # D36
+  if [ -n "${WALD_REUSE_VCODE_OF:-}" ]; then
+    REUSE_R=${WALD_REUSE_VCODE_OF##*-r}
+    [[ "$WALD_REUSE_VCODE_OF" =~ "^wald-v${TAG_VER//./\\.}-r[0-9]+\$" ]] && (( REUSE_R < TAG_R )) \
+      || die "WALD_REUSE_VCODE_OF 는 같은 버전의 앞 태그여야 한다(받은 값: $WALD_REUSE_VCODE_OF, 이번 $BASE)"
+    git -C "$R" ls-remote --exit-code origin "refs/tags/$WALD_REUSE_VCODE_OF" >/dev/null || die "태그 $WALD_REUSE_VCODE_OF 가 origin 에 없다"
+    VCODE=$(( VCODE - TAG_R + REUSE_R ))
+    echo "versionCode 재사용: $WALD_REUSE_VCODE_OF 와 같은 값(같은 버전 재게시)"
+  fi
   [ -z "${WALD_VERSION_CODE:-}" ] || [ "$WALD_VERSION_CODE" = "$VCODE" ] || die "WALD_VERSION_CODE($WALD_VERSION_CODE)가 태그에서 계산한 값($VCODE)과 다르다 — 빼고 돌린다"
   [ "$VCODE" -ge 2100 ] || die "versionCode $VCODE 는 2100 이상이어야 한다(옛 현장 설치본 2066)"
   echo "versionCode $VCODE ($BASE)"
@@ -246,6 +256,7 @@ cp "$APK" "$DAPK" || die "dist 복사"
   echo "package: $(echo "$BADGING" | grep -E '^package:' | sed -E "s/.*name='([^']*)'.*versionCode='([^']*)'.*versionName='([^']*)'.*/\1 versionCode=\2 versionName=\3/")"
   echo "signer sha256: $SIGNER"
   [ "$TARGET" = release ] && echo "signing: release key ($KEYS/android-release.properties)"
+  [ -n "${WALD_REUSE_VCODE_OF:-}" ] && echo "versionCode reused from: $WALD_REUSE_VCODE_OF (same-version republish)"
   echo "apk: ${DAPK:t}"
   echo "size: $(stat -f %z "$DAPK")"
   echo "sha256: $(shasum -a 256 "$DAPK" | awk '{print $1}')"
