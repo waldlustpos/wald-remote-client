@@ -2,6 +2,14 @@ plugins {
     id 'com.android.application'
 }
 
+// 정식 빌드(build-android-local.sh <태그> incoming release)는 메인 앱과 같은 릴리즈 키로 서명한다. 스크립트가 키 설정을
+// 이 폴더의 key.properties(git 제외)로 복사했다가 지운다. 없으면 release 도 debug 키로 서명한다(로컬 시험 — 메인 시험 빌드와 같은 키).
+def keyProps = new Properties()
+def keyPropsFile = rootProject.file('key.properties')
+if (keyPropsFile.exists()) {
+    keyPropsFile.withInputStream { keyProps.load(it) }
+}
+
 android {
     namespace 'co.kr.waldlust.remote.helper'
     compileSdk 34
@@ -10,13 +18,26 @@ android {
         applicationId 'co.kr.waldlust.remote.helper'
         minSdk 22
         targetSdk 33
-        versionCode 1
-        versionName '1.0.0'
+        // 빌드 스크립트가 메인 앱과 같은 버전(정식은 태그에서 계산한 versionCode)을 넘긴다. 이 폴더에서 바로 빌드하면 dev.
+        versionCode((project.findProperty('waldVersionCode') ?: '1').toString().toInteger())
+        versionName((project.findProperty('waldVersionName') ?: 'dev').toString())
+    }
+
+    signingConfigs {
+        release {
+            if (keyPropsFile.exists()) {
+                storeFile file(keyProps['storeFile'])
+                storePassword keyProps['storePassword']
+                keyAlias keyProps['keyAlias']
+                keyPassword keyProps['keyPassword']
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig keyPropsFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
 
