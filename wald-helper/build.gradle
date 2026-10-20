@@ -8,6 +8,8 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:7.3.1'
+        // 2단계 입력 제어(InputService.kt — 원격 앱 Kotlin 코드를 옮김). 원격 앱과 같은 버전(flutter/android/settings.gradle).
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.21'
     }
 }
 

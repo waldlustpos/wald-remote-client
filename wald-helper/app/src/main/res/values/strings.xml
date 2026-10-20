@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Waldlust 원격지원 도우미</string>
+    <!-- 접근성 설정 목록에 보이는 이름 — 원격 앱의 'Waldlust 원격지원 입력'과 구분한다 -->
+    <string name="input_service_label">Waldlust 원격지원 입력(도우미)</string>
+    <string name="accessibility_service_description">Waldlust 원격지원 화면 공유가 설정되면, 다른 기기가 가상 터치로 이 기기를 제어할 수 있도록 허용하고 화면 공유 동의 창을 자동으로 승인합니다. 원격지원 앱을 강제 종료해도 유지됩니다.</string>
 </resources>
