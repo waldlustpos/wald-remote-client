@@ -12,12 +12,16 @@ if (keyPropsFile.exists()) {
 
 android {
     namespace 'co.kr.waldlust.remote.helper'
+    // AGP 7.3.1 의 aapt2 가 android-35 이상을 읽지 못해 34 로 둔다(새 API 는 쓰지 않는다 — targetSdk 만 최신).
     compileSdk 34
 
     defaultConfig {
         applicationId 'co.kr.waldlust.remote.helper'
         minSdk 22
-        targetSdk 33
+        // targetSdk 33 이면 Google Play 프로텍트가 '이전 버전용 앱'으로 설치를 막는다(adb 설치 포함, 넘기려면 기기 PIN —
+        // Android 14 IM-H092W 2026-10-20). 36 은 경고 없이 설치됐다. 메인 앱 깨우기 액션은 메인 BootReceiver 의 intent-filter 에 있어
+        // Android 16 의 명시적 인텐트 일치 규칙에도 맞는다.
+        targetSdk 36
         // 빌드 스크립트가 메인 앱과 같은 버전(정식은 태그에서 계산한 versionCode)을 넘긴다. 이 폴더에서 바로 빌드하면 dev.
         versionCode((project.findProperty('waldVersionCode') ?: '1').toString().toInteger())
         versionName((project.findProperty('waldVersionName') ?: 'dev').toString())
