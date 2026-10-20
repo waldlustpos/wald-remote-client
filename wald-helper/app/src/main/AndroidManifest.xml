@@ -8,6 +8,8 @@
     <permission
         android:name="co.kr.waldlust.remote.permission.INPUT_BRIDGE"
         android:protectionLevel="signature" />
+    <!-- 원격 앱을 되살릴 때 원격 앱의 깨우기 화면(WaldWakeActivity — 같은 권한으로 막혀 있음)을 연다(MainWatcher) -->
+    <uses-permission android:name="co.kr.waldlust.remote.permission.INPUT_BRIDGE" />
 
     <!-- 메인 앱(co.kr.waldlust.remote)을 깨우려면 그 패키지가 보여야 한다(Android 11+ 패키지 가시성) -->
     <queries>

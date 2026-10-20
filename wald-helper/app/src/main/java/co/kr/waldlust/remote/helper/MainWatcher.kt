@@ -1,6 +1,7 @@
 package co.kr.waldlust.remote.helper
 
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -28,6 +29,8 @@ object MainWatcher {
     private const val MAX_REVIVES = 3
     private const val PREFS = "wald_main_watcher"
     private const val KEY_REVIVES = "revives"
+    // 원격 앱 깨우기 화면(applicationId 와 Kotlin 네임스페이스가 달라 클래스는 전체 이름 — 결정 D35)
+    private const val MAIN_WAKE_ACTIVITY = "com.carriez.flutter_hbb.WaldWakeActivity"
 
     private val handler = Handler(Looper.getMainLooper())
     @Volatile
@@ -75,11 +78,11 @@ object MainWatcher {
     /** 원격 앱 프로세스가 죽었다(입력 브리지 콜백 끊김 또는 강제 종료 방송). */
     fun onMainDied(why: String) {
         if (!InputBridgeService.mainServiceRunning) {
-            Log.d(TAG, "main died ($why) — service was not running, not reviving")
+            Log.i(TAG, "main died ($why) — service was not running, not reviving")
             return
         }
         if (!InputService.isOpen) {
-            Log.d(TAG, "main died ($why) — helper input is off, not reviving")
+            Log.i(TAG, "main died ($why) — helper input is off, not reviving")
             return
         }
         if (pending) return
@@ -94,7 +97,7 @@ object MainWatcher {
         if (pending) {
             pending = false
             handler.removeCallbacksAndMessages(null)
-            Log.d(TAG, "main app is back — revive cancelled")
+            Log.i(TAG, "main app is back — revive cancelled")
         }
     }
 
@@ -102,7 +105,7 @@ object MainWatcher {
         pending = false
         val ctx = appContext ?: return
         if (dataCleared || !InputBridgeService.mainServiceRunning) {
-            Log.d(TAG, "revive skipped (dataCleared=$dataCleared)")
+            Log.i(TAG, "revive skipped (dataCleared=$dataCleared)")
             return
         }
         try {
@@ -121,6 +124,19 @@ object MainWatcher {
             return
         }
         prefs.edit().putString(KEY_REVIVES, (recent + now).joinToString(",")).apply()
-        BootReceiver.wakeMain(ctx, "revive after $why")
+        // 원격 앱의 투명 깨우기 화면으로 깨운다. 일부 제조사는 강제 종료된 앱을 방송으로 띄우는 것을 막는다(IM-H092W MediaTek —
+        // 'suppress to start process of staticReceiver'). 접근성이 붙은 이 앱은 백그라운드에서도 화면을 띄울 수 있다.
+        // 깨우기 화면이 없는 옛 원격 앱이면 부팅 때와 같은 방송으로.
+        val wake = Intent().apply {
+            component = ComponentName(MAIN_PKG, MAIN_WAKE_ACTIVITY)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        }
+        try {
+            (InputService.ctx ?: ctx).startActivity(wake)
+            Log.i(TAG, "woke main app via wake activity (revive after $why)")
+        } catch (e: Exception) {
+            Log.i(TAG, "wake activity failed ($e) — broadcast instead")
+            BootReceiver.wakeMain(ctx, "revive after $why")
+        }
     }
 }

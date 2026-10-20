@@ -104,6 +104,17 @@
             android:excludeFromRecents="true"
             android:theme="@style/Transparent" />
 
+        <!-- Waldlust(DSK-02 2단계 — 결정 D41): 도우미가 강제 종료된 이 앱을 되살릴 때 띄우는 투명 화면(WaldWakeActivity).
+             같은 서명 앱만 연다. 별도 작업(taskAffinity 비움)이라 앱 화면(MainActivity)이 앞으로 나오지 않는다. -->
+        <activity
+            android:name=".WaldWakeActivity"
+            android:exported="true"
+            android:permission="co.kr.waldlust.remote.permission.INPUT_BRIDGE"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Transparent" />
+
         <service
             android:name=".MainService"
             android:enabled="true"

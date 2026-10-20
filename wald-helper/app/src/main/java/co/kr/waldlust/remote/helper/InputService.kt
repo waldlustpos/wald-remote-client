@@ -708,7 +708,7 @@ class InputService : AccessibilityService() {
         }
         if (tryClickProjectionAccept(root)) {
             autoAcceptProjection = false
-            Log.d(logTag, "auto-accepted screen projection dialog")
+            Log.i(logTag, "auto-accepted screen projection dialog")
         } else {
             Log.d(logTag, "auto-accept: accept button not clicked in $pkg (childCount=${root.childCount})")
         }

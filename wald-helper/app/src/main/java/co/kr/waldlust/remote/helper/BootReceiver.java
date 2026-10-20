@@ -64,6 +64,6 @@ public class BootReceiver extends BroadcastReceiver {
         // 그냥 보내면 메인 앱이 70초 뒤에 받았다(RK3568) → 포그라운드 대기열로 보낸다.
         wake.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         context.sendBroadcast(wake);
-        Log.d(TAG, "woke main app (" + why + ")");
+        Log.i(TAG, "woke main app (" + why + ")");
     }
 }
