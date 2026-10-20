@@ -41,7 +41,10 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            // R8 로 줄인다(Kotlin stdlib 때문에 커진 크기 — 원격 앱 APK 안에도 들어간다). 매니페스트 컴포넌트·AIDL 은 참조돼 남고,
+            // AIDL 설명자 문자열은 바뀌지 않아 원격 앱(축소 안 함)과 그대로 맞는다.
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
             signingConfig keyPropsFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
