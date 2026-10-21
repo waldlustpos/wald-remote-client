@@ -36,6 +36,8 @@ import hbb.MessageOuterClass.KeyboardMode
  * - 상태: LEGACY(도우미 안 씀 — 이 앱 InputService 그대로) → BINDING → BOUND. BOUND 에서 도우미 접근성이 연결돼 있으면 ready.
  * - ready 면 입력은 도우미로, 아니면 이 앱 InputService 로(지금과 같다). 양방향 빌드는 도우미가 없어 늘 LEGACY.
  * - adb 권한(WRITE_SECURE_SETTINGS)이 있으면 도우미 접근성을 켜고, 켜지면 이 앱 접근성을 목록에서 뺀다(자동 이전 — RootUtil).
+ * - 도우미 접근성이 연결되면 이 앱 InputService 구성요소를 꺼서 접근성 설정 화면에 도우미 한 줄만 보이게 한다(AnyDesk ad1 처럼
+ *   — 부록 A-50). 도우미가 없어지거나 도우미 접근성이 설정에서 꺼지면 다시 켠다(updateMainInputVisibility).
  * 입력한 글자는 로그에 남기지 않는다.
  */
 object WaldInputBridge {
@@ -104,6 +106,7 @@ object WaldInputBridge {
         if (bound) return
         if (helperInputComponent(app) == null) {
             state = State.LEGACY
+            setMainInputHidden(app, false) // 이 앱이 꺼져 있는 동안 도우미가 지워졌을 수 있다
             return
         }
         val intent = Intent(ACTION_INPUT_BRIDGE).setPackage(WaldHelper.PKG)
@@ -119,6 +122,7 @@ object WaldInputBridge {
         } else {
             state = State.LEGACY
             unbindQuietly(app)
+            setMainInputHidden(app, false)
         }
     }
 
@@ -248,6 +252,32 @@ object WaldInputBridge {
             // 도우미 접근성이 켜졌다 — 이 앱 것은 목록에서 뺀다(입력이 한 경로로만, 설정 화면에 '켜짐'이 둘 보이지 않게).
             // 도우미가 지워지면 RootUtil 이 이 앱 것을 다시 넣는다.
             RootUtil.putInputServiceEnabled(app, false)
+        }
+        updateMainInputVisibility(app)
+    }
+
+    /** 이 앱 접근성(InputService)을 접근성 설정 화면에 보일지 정한다(부록 A-50). */
+    private fun updateMainInputVisibility(app: Context) {
+        when {
+            ready -> setMainInputHidden(app, true)
+            helperInputComponent(app) == null -> setMainInputHidden(app, false)
+            // 도우미 접근성이 설정에서 꺼졌다(사용자·입력 제어 끄기·도우미 강제 종료) — 어느 쪽이든 다시 켤 수 있게
+            state == State.BOUND && !isHelperListedInSettings(app) -> setMainInputHidden(app, false)
+            // 그 밖(연결 중·도우미 프로세스 재시작·업데이트 — 설정에는 켜져 있다)은 그대로 둔다(숨겼다 보였다 하지 않게).
+        }
+    }
+
+    /** 이 앱 InputService 구성요소를 끄거나(설정 목록에서 사라지고, 연결돼 있었으면 시스템이 끊는다) 매니페스트 기본값(켜짐)으로 되돌린다. */
+    fun setMainInputHidden(context: Context, hidden: Boolean) {
+        val pm = context.packageManager
+        val component = ComponentName(context, InputService::class.java)
+        val wanted = if (hidden) PackageManager.COMPONENT_ENABLED_STATE_DISABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+        try {
+            if (pm.getComponentEnabledSetting(component) == wanted) return
+            pm.setComponentEnabledSetting(component, wanted, PackageManager.DONT_KILL_APP)
+            Log.i(logTag, "main InputService ${if (hidden) "hidden" else "shown"}")
+        } catch (e: Exception) {
+            Log.w(logTag, "set main InputService state failed: ${e.message}")
         }
     }
 
