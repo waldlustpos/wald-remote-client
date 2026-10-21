@@ -8,6 +8,7 @@
 // (글자 중복·누락). 그 밖의 허용 밖 글자는 곧바로 버리고, 조합 중이던 글자는 확정되는 순간 버린다.
 // 그래서 조합이 끝나기 전에 제출하면(Enter 는 입력기 확정보다 먼저 온다) 값에 한글이 남는다 — 제출하는 곳에서 waldIsAscii 로 막는다.
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
@@ -122,10 +123,14 @@ class _WaldAsciiInputState extends State<WaldAsciiInput> {
     super.dispose();
   }
 
-  Widget _tip(String key) => Text(
-        translate(key),
-        style: const TextStyle(color: WaldPalette.amber600, fontSize: 12),
-      ).paddingOnly(left: 12, bottom: 4);
+  // 대화상자(AlertDialog 는 내용의 고유 너비로 창 너비를 정한다)가 안내가 뜰 때마다 넓어지지 않게,
+  // 안내는 너비 계산에서 빼고 입력 칸이 정한 너비 안에서 줄을 바꾼다.
+  Widget _tip(String key) => WaldNoIntrinsicWidth(
+        child: Text(
+          translate(key),
+          style: const TextStyle(color: WaldPalette.amber600, fontSize: 12),
+        ).paddingOnly(left: 12, bottom: 4),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -148,4 +153,22 @@ class _WaldAsciiInputState extends State<WaldAsciiInput> {
       ],
     );
   }
+}
+
+/// 고유 너비를 0 으로 알리는 감싸개 — 배치는 부모가 준 너비대로 한다.
+class WaldNoIntrinsicWidth extends SingleChildRenderObjectWidget {
+  const WaldNoIntrinsicWidth({Key? key, required Widget child})
+      : super(key: key, child: child);
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderNoIntrinsicWidth();
+}
+
+class _RenderNoIntrinsicWidth extends RenderProxyBox {
+  @override
+  double computeMinIntrinsicWidth(double height) => 0;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => 0;
 }

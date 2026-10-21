@@ -1,4 +1,4 @@
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/wald_hangul.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -91,5 +91,30 @@ void main() {
       expect(out.text, 'ab');
       expect(out.selection, const TextSelection.collapsed(offset: 2));
     });
+  });
+
+  // 기기 접속 비밀번호 대화상자가 안내가 뜰 때 넓어지던 문제(AlertDialog 는 내용의 고유 너비로 창 너비를 정한다).
+  testWidgets('안내 문구는 대화상자 너비를 바꾸지 않는다', (tester) async {
+    const tip = Text('한글은 입력되지 않습니다 — 한/영 키로 영문 입력으로 바꾸세요');
+    Future<double> dialogWidth(Widget? below) async {
+      await tester.pumpWidget(MaterialApp(
+        home: AlertDialog(
+          content: Column(
+            key: const ValueKey('content'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(width: 200, height: 40),
+              if (below != null) below,
+            ],
+          ),
+        ),
+      ));
+      return tester.getSize(find.byKey(const ValueKey('content'))).width;
+    }
+
+    final without = await dialogWidth(null);
+    expect(await dialogWidth(tip), greaterThan(without)); // 감싸지 않으면 넓어진다
+    expect(await dialogWidth(const WaldNoIntrinsicWidth(child: tip)), without);
   });
 }
