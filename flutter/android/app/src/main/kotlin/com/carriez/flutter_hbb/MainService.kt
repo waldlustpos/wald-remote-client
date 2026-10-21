@@ -801,17 +801,15 @@ class MainService : Service() {
         username: String,
         peerId: String
     ) {
-        val notification = notificationBuilder
-            .setOngoing(false)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setContentTitle(translate("Do you accept?"))
-            // Waldlust(DSK-07): 접속한 쪽 이름(username)은 알림에 넣지 않는다(부록 A-31).
-            .setContentText("$type:$peerId")
-            // .setStyle(MediaStyle().setShowActionsInCompactView(0, 1))
-            // .addAction(R.drawable.check_blue, "check", genLoginRequestPendingIntent(true))
-            // .addAction(R.drawable.close_red, "close", genLoginRequestPendingIntent(false))
-            .build()
-        notificationManager.notify(getClientNotifyID(clientID), notification)
+        // Waldlust(DSK-02 — 부록 A-52): 접속 요청도 따로 띄우지 않고 서비스 알림 문구를 바꾼다(상단바 아이콘 하나).
+        // 비밀번호로만 받는 기기(approve-mode=password — 수신 전용)는 기기에서 수락할 수 없고 제어측이 비밀번호를 넣는 동안의
+        // 요청이라 소리 없이 문구만, 기기에서 수락하는 기기는 지금처럼 알린다. 인증되면 '연결됨'으로, 그만두면 stop_capture 에서 되돌린다.
+        // Waldlust(DSK-07): 접속한 쪽 이름(username)은 알림에 넣지 않는다(부록 A-31).
+        if (FFI.getOption("approve-mode") == "password") {
+            updateForegroundNotification(translate("Incoming connection"), "$type:$peerId", false)
+        } else {
+            updateForegroundNotification(translate("Do you accept?"), "$type:$peerId", true)
+        }
     }
 
     private fun onClientAuthorizedNotification(

@@ -25,6 +25,7 @@ object FFI {
     external fun setCodecInfo(info: String)
     external fun getLocalOption(key: String): String
     external fun getBuildinOption(key: String): String
+    external fun getOption(key: String): String // Waldlust(DSK-02 — 부록 A-52)
     external fun onClipboardUpdate(clips: ByteBuffer)
     external fun isServiceClipboardEnabled(): Boolean
 }

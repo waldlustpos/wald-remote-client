@@ -3148,6 +3148,23 @@ pub mod server_side {
         return env.new_string(res).unwrap_or_default().into_raw();
     }
 
+    // Waldlust(DSK-02 — 부록 A-52): Config 옵션(approve-mode 등, OVERWRITE 포함)을 Kotlin 에서 읽는다.
+    #[no_mangle]
+    pub unsafe extern "system" fn Java_ffi_FFI_getOption(
+        env: JNIEnv,
+        _class: JClass,
+        key: JString,
+    ) -> jstring {
+        let mut env = env;
+        let res = if let Ok(key) = env.get_string(&key) {
+            let key: String = key.into();
+            super::main_get_option(key)
+        } else {
+            "".into()
+        };
+        return env.new_string(res).unwrap_or_default().into_raw();
+    }
+
     #[no_mangle]
     pub unsafe extern "system" fn Java_ffi_FFI_isServiceClipboardEnabled(
         env: JNIEnv,
