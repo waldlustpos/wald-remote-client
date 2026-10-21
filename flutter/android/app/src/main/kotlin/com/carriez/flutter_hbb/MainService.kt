@@ -234,6 +234,8 @@ class MainService : Service() {
             "stop_capture" -> {
                 Log.d(logTag, "from rust:stop_capture")
                 stopCapture()
+                // Waldlust(DSK-02 — 부록 A-52): 화면 공유 연결이 모두 끝났다(Rust remove_connection) — 서비스 알림 문구를 되돌린다.
+                updateForegroundNotification(null, null, false)
             }
             "half_scale" -> {
                 val halfScale = arg1.toBoolean()
@@ -819,14 +821,9 @@ class MainService : Service() {
         peerId: String
     ) {
         cancelNotification(clientID)
-        val notification = notificationBuilder
-            .setOngoing(false)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setContentTitle("$type ${translate("Established")}")
-            // Waldlust(DSK-07): 접속한 쪽 이름(username)은 알림에 넣지 않는다(부록 A-31).
-            .setContentText(peerId)
-            .build()
-        notificationManager.notify(getClientNotifyID(clientID), notification)
+        // Waldlust(DSK-02 — 부록 A-52): 연결 알림을 따로 띄우지 않고 서비스 알림 문구를 바꾼다(상단바 아이콘 하나).
+        // Waldlust(DSK-07): 접속한 쪽 이름(username)은 알림에 넣지 않는다(부록 A-31).
+        updateForegroundNotification("$type ${translate("Established")}", peerId, true)
     }
 
     private fun voiceCallRequestNotification(
@@ -874,6 +871,23 @@ class MainService : Service() {
             .setStyle(null)
             .setContentTitle(title)
             .setContentText(text)
+            .build()
+        notificationManager.notify(DEFAULT_NOTIFY_ID, notification)
+    }
+
+    // Waldlust(DSK-02 — 부록 A-52): 서비스 알림(DEFAULT_NOTIFY_ID) 문구를 바꾼다. null 이면 기본 문구.
+    // alert 면 한 번 알린다(헤드업·소리 — 따로 띄우던 연결 알림과 같다), 되돌릴 때는 조용히.
+    // notificationBuilder 는 요청 알림과 함께 쓰므로 서비스 알림 속성(ongoing·우선순위)을 다시 넣는다.
+    private fun updateForegroundNotification(title: String?, text: String?, alert: Boolean) {
+        val notification = notificationBuilder
+            .clearActions()
+            .setStyle(null)
+            .setOngoing(true)
+            .setPriority(if (alert) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_DEFAULT)
+            .setOnlyAlertOnce(!alert)
+            .setContentTitle(title ?: DEFAULT_NOTIFY_TITLE)
+            .setContentText(text ?: translate(DEFAULT_NOTIFY_TEXT))
+            .setWhen(System.currentTimeMillis())
             .build()
         notificationManager.notify(DEFAULT_NOTIFY_ID, notification)
     }
