@@ -125,6 +125,11 @@ object WaldInputBridge {
             state = State.LEGACY
             unbindQuietly(app)
             setMainInputHidden(app, false)
+            // 도우미 프로세스를 띄우지 못하면(제조사 정책 — IM-H092W 'process is bad') 바인딩이 바로 거절된다. 조금 뒤 다시 한다.
+            Log.i(logTag, "helper bridge bind failed, retry in ${retryDelayMs}ms")
+            mainHandler.removeCallbacks(retryBind) // 여러 곳에서 불려도 기다리는 재시도는 하나만
+            mainHandler.postDelayed(retryBind, retryDelayMs)
+            retryDelayMs = (retryDelayMs * 2).coerceAtMost(60_000L)
         }
     }
 
@@ -149,6 +154,8 @@ object WaldInputBridge {
     private fun rebindLater(delayMs: Long) {
         mainHandler.postDelayed({ appContext?.let { ensureBound(it) } }, delayMs)
     }
+
+    private val retryBind = Runnable { appContext?.let { ensureBound(it) } }
 
     /** 바인딩이 죽었다 — 풀고 조금 뒤 다시 바인딩한다. */
     private fun rebindAfterDeath() {
