@@ -128,7 +128,7 @@ class _WaldAsciiInputState extends State<WaldAsciiInput> {
   Widget _tip(String key) => WaldNoIntrinsicWidth(
         child: Text(
           translate(key),
-          style: const TextStyle(color: WaldPalette.amber600, fontSize: 12),
+          style: const TextStyle(color: WaldPalette.amber700, fontSize: 12),
         ).paddingOnly(left: 12, bottom: 4),
       );
 
