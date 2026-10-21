@@ -177,11 +177,18 @@ git checkout -- flutter/pubspec.yaml flutter/pubspec.lock
 
 # 2) 네이티브 라이브러리: CI 처럼 ABI 마다 의존성 → Rust 순서로 번갈아 한다(9dc8c7c). 다음 트리플렛 설치가 앞 설치분을 지우기 때문이다.
 step deps-arm64; ./flutter/build_android_deps.sh arm64-v8a  > "$LOG/deps-arm64.log" 2>&1 || die deps-arm64
+# hwcodec·scrap 은 vcpkg 정적 라이브러리(FFmpeg 등)를 자기 rlib 에 묶는데 그 파일 변경은 감시하지 않는다. 공용 target 에 남은 옛 rlib 이
+# 패치 전 FFmpeg 를 그대로 링크한다(2026-10-21 발견 — res/vcpkg/ffmpeg 패치가 APK 에 안 들어감). 매번 두 크레이트를 다시 빌드한다.
+cargo clean -q -p hwcodec -p scrap --release --target aarch64-linux-android || die "cargo clean arm64"
 step rust-arm64; ./flutter/ndk_arm64.sh                      > "$LOG/rust-arm64.log" 2>&1 || die rust-arm64
-# build_android_deps.sh 는 installed/arm-neon-android 를 arm-android 로 mv 한다. arm-android 가 이미 있으면 그 안에 중첩돼
-# 다음 실행의 mv 가 "Directory not empty" 로 실패한다. 빌드는 arm-android/{include,lib} 만 쓰므로 중첩분을 지운다.
-rm -rf "$VCPKG_ROOT/installed/arm-android/arm-neon-android"
+# build_android_deps.sh 는 installed/arm-neon-android 를 arm-android 로 mv 한다. arm-android 가 이미 있으면 그 안에 중첩되고
+# armv7 Rust 는 옛 arm-android/{include,lib} 를 링크한다(2026-10-21 발견 — 09-29 설치분이 그대로 쓰였다). 그래서 통째로 지우고
+# mv 가 이름을 바꾸게 한다(vcpkg 가 관리하는 트리플렛 폴더가 아니라 지워도 된다).
+rm -rf "$VCPKG_ROOT/installed/arm-android"
 step deps-armv7; ./flutter/build_android_deps.sh armeabi-v7a > "$LOG/deps-armv7.log" 2>&1 || die deps-armv7
+[ -f "$VCPKG_ROOT/installed/arm-android/lib/libavcodec.a" ] && [ ! -d "$VCPKG_ROOT/installed/arm-android/arm-neon-android" ] \
+  || die "deps-armv7 설치 위치(installed/arm-android)"
+cargo clean -q -p hwcodec -p scrap --release --target armv7-linux-androideabi || die "cargo clean armv7"
 step rust-armv7; ./flutter/ndk_arm.sh                        > "$LOG/rust-armv7.log" 2>&1 || die rust-armv7
 
 # 2b) 수신 전용: 도우미 앱(wald-helper — 부록 A-44 1단계, 결정 D39·D40). 메인 앱과 같은 버전(정식은 태그의 versionCode)·같은 서명
