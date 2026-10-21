@@ -76,6 +76,15 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <!-- Waldlust(DSK-02 — 부록 A-50): 접근성 목록을 다시 읽게 하는 신호. 이름이 패키지 이름과 같아 상태를 바꾸면
+             시스템(PackageMonitor)이 '패키지 전체가 바뀜'으로 보고 접근성 목록을 바로 다시 읽는다(WaldInputBridge.setMainInputHidden).
+             화면·인텐트 필터 없음. -->
+        <activity-alias
+            android:name="${applicationId}"
+            android:enabled="true"
+            android:exported="false"
+            android:targetActivity=".MainActivity" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode|navigation"

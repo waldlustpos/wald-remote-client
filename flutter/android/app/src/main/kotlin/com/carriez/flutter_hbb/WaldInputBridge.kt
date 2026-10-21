@@ -280,6 +280,12 @@ object WaldInputBridge {
                 InputService.ctx?.disableSelf()
             }
             pm.setComponentEnabledSetting(component, wanted, PackageManager.DONT_KILL_APP)
+            // 시스템 접근성 목록은 구성요소 하나가 바뀐 것으로는 다시 읽지 않는다(앱 설치·업데이트·삭제·재부팅 때만 — 에뮬레이터 API 34).
+            // 패키지 이름과 같은 이름의 구성요소(manifest activity-alias)도 바꿔(켜짐 기본값 ↔ 켜짐 — 동작은 같다) 바로 다시 읽게 한다.
+            val refresh = ComponentName(context.packageName, context.packageName)
+            val next = if (pm.getComponentEnabledSetting(refresh) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+                PackageManager.COMPONENT_ENABLED_STATE_DEFAULT else PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            pm.setComponentEnabledSetting(refresh, next, PackageManager.DONT_KILL_APP)
             Log.i(logTag, "main InputService ${if (hidden) "hidden" else "shown"}")
         } catch (e: Exception) {
             Log.w(logTag, "set main InputService state failed: ${e.message}")
