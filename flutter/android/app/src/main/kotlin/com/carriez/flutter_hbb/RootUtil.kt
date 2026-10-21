@@ -56,6 +56,7 @@ object RootUtil {
             return true
         }
         if (InputService.isOpen) return true
+        WaldInputBridge.setMainInputHidden(context, false) // 도우미가 없어졌다 — 숨겨 둔 이 앱 접근성을 먼저 되살린다(부록 A-50)
         return enableWithRetry(context, ComponentName(context, InputService::class.java)) { InputService.isOpen }
     }
 
