@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
+import 'package:flutter_hbb/common/wald_hangul.dart';
 import 'package:flutter_hbb/common/wald_mac_status_item.dart';
 import 'package:flutter_hbb/common/widgets/wald_app_info.dart';
 import 'package:flutter_hbb/consts.dart';
@@ -963,6 +964,8 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
         errMsg1 = "";
       });
       final pass = p0.text.trim();
+      // Waldlust(UI-03 — 부록 A-49): 접속 때 칠 수 없는 비밀번호를 만들지 않는다(칸 아래 안내가 떠 있다).
+      if (!waldIsAscii(pass) || !waldIsAscii(p1.text.trim())) return;
       if (pass.isNotEmpty) {
         final Iterable violations = rules.where((r) => !r.validate(pass));
         if (violations.isNotEmpty) {
@@ -1012,22 +1015,27 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    obscureText: true,
-                    decoration: InputDecoration(
-                        labelText: translate('Password'),
-                        errorText: errMsg0.isNotEmpty ? errMsg0 : null),
-                    controller: p0,
-                    autofocus: true,
-                    onChanged: (value) {
-                      rxPass.value = value.trim();
-                      setState(() {
-                        errMsg0 = '';
-                        updateCanSubmit();
-                      });
-                    },
-                    maxLength: maxLength,
-                  ).workaroundFreezeLinuxMint(),
+                  // Waldlust(UI-03 — 부록 A-49): 영문만 받고 한글·Caps Lock 을 칸 아래에 알린다.
+                  child: WaldAsciiInput(
+                    capsLock: true,
+                    builder: (f) => TextField(
+                      obscureText: true,
+                      decoration: InputDecoration(
+                          labelText: translate('Password'),
+                          errorText: errMsg0.isNotEmpty ? errMsg0 : null),
+                      controller: p0,
+                      autofocus: true,
+                      onChanged: (value) {
+                        rxPass.value = value.trim();
+                        setState(() {
+                          errMsg0 = '';
+                          updateCanSubmit();
+                        });
+                      },
+                      maxLength: maxLength,
+                      inputFormatters: [f],
+                    ).workaroundFreezeLinuxMint(),
+                  ),
                 ),
               ],
             ),
@@ -1042,20 +1050,24 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    obscureText: true,
-                    decoration: InputDecoration(
-                        labelText: translate('Confirmation'),
-                        errorText: errMsg1.isNotEmpty ? errMsg1 : null),
-                    controller: p1,
-                    onChanged: (value) {
-                      setState(() {
-                        errMsg1 = '';
-                        updateCanSubmit();
-                      });
-                    },
-                    maxLength: maxLength,
-                  ).workaroundFreezeLinuxMint(),
+                  child: WaldAsciiInput(
+                    capsLock: true,
+                    builder: (f) => TextField(
+                      obscureText: true,
+                      decoration: InputDecoration(
+                          labelText: translate('Confirmation'),
+                          errorText: errMsg1.isNotEmpty ? errMsg1 : null),
+                      controller: p1,
+                      onChanged: (value) {
+                        setState(() {
+                          errMsg1 = '';
+                          updateCanSubmit();
+                        });
+                      },
+                      maxLength: maxLength,
+                      inputFormatters: [f],
+                    ).workaroundFreezeLinuxMint(),
+                  ),
                 ),
               ],
             ),
