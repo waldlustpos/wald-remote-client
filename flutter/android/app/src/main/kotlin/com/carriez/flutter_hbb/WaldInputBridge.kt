@@ -274,6 +274,11 @@ object WaldInputBridge {
         val wanted = if (hidden) PackageManager.COMPONENT_ENABLED_STATE_DISABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
         try {
             if (pm.getComponentEnabledSetting(component) == wanted) return
+            if (hidden && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                // 연결된 채로 구성요소를 끄면 시스템이 '오작동(crashed)'으로 기록해 되살려도 다시 연결되지 않는다
+                // (에뮬레이터 API 34 확인) — 먼저 스스로 접근성 목록에서 빠진다(권한 필요 없음).
+                InputService.ctx?.disableSelf()
+            }
             pm.setComponentEnabledSetting(component, wanted, PackageManager.DONT_KILL_APP)
             Log.i(logTag, "main InputService ${if (hidden) "hidden" else "shown"}")
         } catch (e: Exception) {
