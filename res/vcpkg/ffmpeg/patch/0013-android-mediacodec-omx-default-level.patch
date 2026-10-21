@@ -1,0 +1,27 @@
+Subject: [PATCH] android mediacodec encode: set level for OMX codecs when profile is set
+
+ACodec (OMX path) returns INVALID_OPERATION from configure when
+"profile" is set without "level". hwcodec always sets the H.264/HEVC
+profile but never the level, so hardware encoding fails on OMX-only
+devices (e.g. OMX.rk.video_encoder.avc on Android 11, OMX.qcom on 7.1)
+and RustDesk falls back to half-scaled software encoding.
+---
+diff --git a/libavcodec/mediacodecenc.c b/libavcodec/mediacodecenc.c
+index 768c815..dbd67ba 100644
+--- a/libavcodec/mediacodecenc.c
++++ b/libavcodec/mediacodecenc.c
+@@ -342,6 +342,14 @@ static av_cold int mediacodec_init(AVCodecContext *avctx)
+     if (ret > 0) {
+         av_log(avctx, AV_LOG_DEBUG, "set profile to 0x%x\n", ret);
+         ff_AMediaFormat_setInt32(format, "profile", ret);
++        // OMX codecs (ACodec) fail to configure with a profile but no level
++        // (INVALID_OPERATION), e.g. OMX.rk.video_encoder.avc on Android 11.
++        if (s->level <= 0 && s->name && av_strstart(s->name, "OMX.", NULL)) {
++            if (avctx->codec_id == AV_CODEC_ID_H264)
++                s->level = 0x8000;  // AVCLevel51
++            else if (avctx->codec_id == AV_CODEC_ID_HEVC)
++                s->level = 0x10000; // HEVCMainTierLevel51
++        }
+     }
+     if (s->level > 0) {
+         av_log(avctx, AV_LOG_DEBUG, "set level to 0x%x\n", s->level);

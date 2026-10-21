@@ -1,0 +1,25 @@
+Subject: [PATCH] android mediacodec encode: limit Rockchip i-frame-interval to 600 s
+
+Rockchip MPP (OMX.rk.* / c2.rk.*) derives log2_max_pic_order_cnt_lsb from
+the GOP. With RustDesk's endless GOP it writes
+log2_max_pic_order_cnt_lsb_minus4 = 13 (valid range 0..12), so the
+h264_metadata crop BSF and FFmpeg's h264 decoder reject the SPS and every
+frame fails. 600 s keeps the value at 12 (checked on RK3568 Android 11).
+---
+diff --git a/libavcodec/mediacodecenc.c b/libavcodec/mediacodecenc.c
+index dbd67ba..b3f8849 100644
+--- a/libavcodec/mediacodecenc.c
++++ b/libavcodec/mediacodecenc.c
+@@ -334,6 +334,12 @@ static av_cold int mediacodec_init(AVCodecContext *avctx)
+     } else {
+         av_log(avctx, AV_LOG_DEBUG, "Set i-frame-interval to %d\n", gop);
+     }
++    // Rockchip MPP derives log2_max_pic_order_cnt_lsb from the GOP: an hour or
++    // more gives log2_max_pic_order_cnt_lsb_minus4 = 13 (spec max 12) and the
++    // SPS is rejected by h264_metadata and decoders. 600 s gives 12.
++    if (gop > 600 && s->name &&
++        (av_strstart(s->name, "OMX.rk.", NULL) || av_strstart(s->name, "c2.rk.", NULL)))
++        gop = 600;
+ 
+     ff_AMediaFormat_setInt32(format, "frame-rate", s->fps);
+     ff_AMediaFormat_setInt32(format, "i-frame-interval", gop);
