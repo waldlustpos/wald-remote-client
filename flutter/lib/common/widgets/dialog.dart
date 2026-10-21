@@ -711,7 +711,7 @@ class PasswordWidget extends StatefulWidget {
     this.errorText,
     this.title,
     this.maxLength,
-    this.warnHangul = false,
+    this.asciiOnly = false,
   }) : super(key: key);
 
   final TextEditingController controller;
@@ -721,8 +721,8 @@ class PasswordWidget extends StatefulWidget {
   final String? errorText;
   final String? title;
   final int? maxLength;
-  // Waldlust(DSK-03 — 부록 A-32): 한글이 들어오면 칸 아래에 안내(common/wald_hangul.dart).
-  final bool warnHangul;
+  // Waldlust(UI-03 — 부록 A-49): 영문만 받고 한글·Caps Lock 을 칸 아래에 알린다(common/wald_hangul.dart).
+  final bool asciiOnly;
 
   @override
   State<PasswordWidget> createState() => _PasswordWidgetState();
@@ -733,20 +733,10 @@ class _PasswordWidgetState extends State<PasswordWidget> {
   final _focusNode = FocusNode();
   Timer? _timer;
   Timer? _timerReRequestFocus;
-  bool _hasHangul = false;
-
-  void _onTextChanged() {
-    final hasHangul = waldHasHangul(widget.controller.text);
-    if (hasHangul != _hasHangul) setState(() => _hasHangul = hasHangul);
-  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.warnHangul) {
-      _hasHangul = waldHasHangul(widget.controller.text);
-      widget.controller.addListener(_onTextChanged);
-    }
     if (widget.autoFocus) {
       _timer =
           Timer(Duration(milliseconds: 50), () => _focusNode.requestFocus());
@@ -768,7 +758,6 @@ class _PasswordWidgetState extends State<PasswordWidget> {
   void dispose() {
     _timer?.cancel();
     _timerReRequestFocus?.cancel();
-    widget.controller.removeListener(_onTextChanged);
     _focusNode.unfocus();
     _focusNode.dispose();
     super.dispose();
@@ -776,6 +765,13 @@ class _PasswordWidgetState extends State<PasswordWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.asciiOnly) {
+      return WaldAsciiInput(capsLock: true, builder: (f) => _field([f]));
+    }
+    return _field(null);
+  }
+
+  Widget _field(List<TextInputFormatter>? inputFormatters) {
     return DialogTextField(
       title: translate(widget.title ?? DialogTextField.kPasswordTitle),
       hintText: translate(widget.hintText ?? 'Enter your password'),
@@ -796,10 +792,10 @@ class _PasswordWidgetState extends State<PasswordWidget> {
         },
       ),
       obscureText: !_passwordVisible,
-      errorText: widget.errorText ??
-          (_hasHangul ? translate(kWaldPasswordHangulTip) : null),
+      errorText: widget.errorText,
       focusNode: _focusNode,
       maxLength: widget.maxLength,
+      inputFormatters: inputFormatters,
     );
   }
 }
@@ -923,6 +919,8 @@ _connectDialog(
       final osPassword = osPasswordController?.text.trim() ?? '';
       final password = passwordController?.text.trim() ?? '';
       if (passwordController != null && password.isEmpty) return;
+      // Waldlust(UI-03 — 부록 A-49): 조합 중이던 한글이 남았으면 보내지 않는다(칸 아래 안내가 떠 있다).
+      if (!waldIsAscii(password)) return;
       if (rememberAccount) {
         bind.sessionPeerOption(
             sessionId: sessionId, name: 'os-username', value: osUsername);
@@ -1029,6 +1027,7 @@ _connectDialog(
           PasswordWidget(
             controller: passwordController,
             autoFocus: osUsernameController == null,
+            asciiOnly: true,
           ),
           rememberWidget(
             translate('Remember password'),

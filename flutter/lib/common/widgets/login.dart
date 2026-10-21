@@ -416,18 +416,22 @@ class LoginWidgetUserPass extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 8.0),
-            DialogTextField(
-                title: translate(DialogTextField.kUsernameTitle),
-                controller: username,
-                focusNode: userFocusNode,
-                prefixIcon: DialogTextField.kUsernameIcon,
-                errorText: usernameMsg),
+            // Waldlust(UI-03 — 부록 A-49): 이메일·비밀번호 모두 영문만(common/wald_hangul.dart).
+            WaldAsciiInput(
+              builder: (f) => DialogTextField(
+                  title: translate(DialogTextField.kUsernameTitle),
+                  controller: username,
+                  focusNode: userFocusNode,
+                  prefixIcon: DialogTextField.kUsernameIcon,
+                  inputFormatters: [f],
+                  errorText: usernameMsg),
+            ),
             PasswordWidget(
               controller: pass,
               autoFocus: false,
               reRequestFocus: true,
               errorText: passMsg,
-              warnHangul: true,
+              asciiOnly: true,
             ),
             // NOT use Offstage to wrap LinearProgressIndicator
             if (isInProgress) const LinearProgressIndicator(),
@@ -561,11 +565,8 @@ Future<bool?> loginDialog() async {
         setState(() => passwordMsg = translate('Password missed'));
         return;
       }
-      // Waldlust(DSK-03 — 부록 A-32): 한글 모드로 친 비밀번호는 보내지 않는다(칸 아래 안내와 같은 문구).
-      if (waldHasHangul(password.text)) {
-        setState(() => passwordMsg = translate(kWaldPasswordHangulTip));
-        return;
-      }
+      // Waldlust(UI-03 — 부록 A-49): 조합 중이던 한글이 남았으면 보내지 않는다(칸 아래 안내가 떠 있다).
+      if (!waldIsAscii(username.text) || !waldIsAscii(password.text)) return;
       curOP.value = 'rustdesk';
       setState(() => isInProgress = true);
       try {

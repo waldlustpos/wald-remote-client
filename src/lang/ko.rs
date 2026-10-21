@@ -648,8 +648,9 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         // Waldlust(결정 D37): 데스크탑 양방향 홈의 새 버전 카드(어드민 /api/app/latest).
         ("wald-update-title", "새 버전"),
         ("wald-update-{}-tip", "새 버전 {} 이 나왔습니다. 어드민 '원격 설치 파일'에서 받아 설치합니다."),
-        // Waldlust(DSK-03 — 부록 A-32): 로그인 비밀번호 칸에 한글이 들어왔을 때(flutter/lib/common/wald_hangul.dart).
-        ("wald-password-hangul-tip", "한글 입력 상태입니다. 영문으로 바꾼 뒤 비밀번호를 다시 입력하세요."),
+        // Waldlust(UI-03 — 부록 A-49): 로그인·접속 비밀번호 칸 아래 안내(flutter/lib/common/wald_hangul.dart). 어드민 AsciiInput 과 같은 문구.
+        ("wald-password-hangul-tip", "한글은 입력되지 않습니다 — 한/영 키로 영문 입력으로 바꾸세요"),
+        ("wald-password-capslock-tip", "Caps Lock 이 켜져 있습니다"),
         // Waldlust(DSK-10 — 부록 A-39): 32비트 Sciter 수신 전용 화면의 앱 이름. 브랜드라 언어와 관계없이 같고(en.rs 도 같은 값),
         // Flutter 상수 kWaldAppDisplayName(flutter/lib/common/widgets/wald_app_info.dart)과 같은 값이다.
         ("wald-app-display-name", "Waldlust 원격지원"),
