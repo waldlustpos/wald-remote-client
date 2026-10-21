@@ -68,6 +68,7 @@ object WaldInputBridge {
     private var mainServiceRunning = false
 
     private var bound = false
+    private var disconnectToken = 0 // Android 7 이하 죽은 바인딩 확인용(onServiceDisconnected)
     private var receiverRegistered = false
     private var retryDelayMs = 1_000L
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -216,6 +217,14 @@ object WaldInputBridge {
             ready = false
             state = State.BINDING
             onStateChanged()
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                // Android 7 이하는 onBindingDied 가 없다 — 도우미가 강제 종료되면 바인딩이 죽은 채(DEAD) 다시 오지 않는다
+                // (T2 mini 7.1 확인, 부록 A-50 시험). 곧 다시 연결되지 않으면 죽은 것으로 보고 다시 바인딩한다.
+                val token = ++disconnectToken
+                mainHandler.postDelayed({
+                    if (token == disconnectToken && bound && remote == null && state == State.BINDING) onBindingDied(name)
+                }, 5_000L)
+            }
         }
 
         override fun onBindingDied(name: ComponentName?) {
