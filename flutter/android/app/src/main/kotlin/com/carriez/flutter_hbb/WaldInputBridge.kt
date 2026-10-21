@@ -69,6 +69,10 @@ object WaldInputBridge {
 
     private var bound = false
     private var bindCheckToken = 0 // 죽은 바인딩 확인용(scheduleBindCheck)
+    // 도우미 바인딩이 거절되고 있다(도우미 프로세스를 띄우지 못함) — 이 앱이 앞에 오면 도우미 화면으로 깨운다(WaldHelper.activateIfStopped).
+    @Volatile
+    var bindRefused = false
+        private set
     private var receiverRegistered = false
     private var retryDelayMs = 1_000L
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -126,6 +130,7 @@ object WaldInputBridge {
             unbindQuietly(app)
             setMainInputHidden(app, false)
             // 도우미 프로세스를 띄우지 못하면(제조사 정책 — IM-H092W 'process is bad') 바인딩이 바로 거절된다. 조금 뒤 다시 한다.
+            bindRefused = true
             Log.i(logTag, "helper bridge bind failed, retry in ${retryDelayMs}ms")
             mainHandler.removeCallbacks(retryBind) // 여러 곳에서 불려도 기다리는 재시도는 하나만
             mainHandler.postDelayed(retryBind, retryDelayMs)
@@ -234,6 +239,7 @@ object WaldInputBridge {
                 remote = r
                 state = State.BOUND
                 retryDelayMs = 1_000L
+                bindRefused = false
                 ready = r.isInputConnected()
                 val left = armUntil - SystemClock.uptimeMillis()
                 if (left > 0) r.armProjectionAccept(left)

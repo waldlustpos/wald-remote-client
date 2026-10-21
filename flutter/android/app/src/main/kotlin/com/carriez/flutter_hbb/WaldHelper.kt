@@ -87,9 +87,10 @@ object WaldHelper {
 
     /** 도우미가 stopped 면 신호를 보내 푼다(이 앱을 열 때·설치가 끝났을 때). 도우미는 받기만 하고 이 앱을 다시 깨우지 않는다. */
     fun activateIfStopped(context: Context) {
-        if (!isStopped(context)) return
+        if (!isStopped(context) && !WaldInputBridge.bindRefused) return
         // MediaTek(IM-H092W) 등은 강제 종료된 도우미를 방송·바인딩으로 띄우지 않는다('process is bad' — 지웠다 깔아도 남는다).
-        // 앞에 뜬 이 앱이 도우미 화면(WakeActivity — 화면 없이 바로 닫힌다)을 열면 풀린다(부록 A-50 시험). 못 열면(뒤에 있을 때) 방송만 간다.
+        // 짧은 시간에 두 번 죽은 앱(Android 'bad' 프로세스)도 같다. 앞에 뜬 이 앱이 도우미 화면(WakeActivity — 화면 없이 바로
+        // 닫힌다)을 열면 풀린다(부록 A-50 시험). 못 열면(뒤에 있을 때) 방송만 간다.
         try {
             context.startActivity(Intent().apply {
                 component = ComponentName(PKG, WAKE_ACTIVITY)
