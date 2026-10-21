@@ -34,6 +34,8 @@ object WaldHelper {
     const val PKG = "co.kr.waldlust.remote.helper"
     private const val RECEIVER = "$PKG.BootReceiver"
     private const val ACTION_ACTIVATE = "$PKG.ACTIVATE"
+    private const val WAKE_ACTIVITY = "$PKG.WakeActivity"
+    private const val EXTRA_ACTIVATE_ONLY = "activate_only" // 도우미 WakeActivity — 이 앱을 다시 깨우지 않고 닫힌다
     private const val ASSET = "wald-helper.apk"
     const val ACTION_INSTALL_STATUS = "co.kr.waldlust.remote.WALD_HELPER_INSTALL_STATUS"
     const val logTag = "WaldHelperMgr"
@@ -86,12 +88,25 @@ object WaldHelper {
     /** 도우미가 stopped 면 신호를 보내 푼다(이 앱을 열 때·설치가 끝났을 때). 도우미는 받기만 하고 이 앱을 다시 깨우지 않는다. */
     fun activateIfStopped(context: Context) {
         if (!isStopped(context)) return
+        // MediaTek(IM-H092W) 등은 강제 종료된 도우미를 방송·바인딩으로 띄우지 않는다('process is bad' — 지웠다 깔아도 남는다).
+        // 앞에 뜬 이 앱이 도우미 화면(WakeActivity — 화면 없이 바로 닫힌다)을 열면 풀린다(부록 A-50 시험). 못 열면(뒤에 있을 때) 방송만 간다.
+        try {
+            context.startActivity(Intent().apply {
+                component = ComponentName(PKG, WAKE_ACTIVITY)
+                putExtra(EXTRA_ACTIVATE_ONLY, true)
+                addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e: Exception) {
+            Log.w(logTag, "cannot open helper activity: ${e.message}")
+        }
         val intent = Intent(ACTION_ACTIVATE).apply {
             component = ComponentName(PKG, RECEIVER)
             addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
         }
         context.sendBroadcast(intent)
         Log.d(logTag, "helper activated")
+        WaldInputBridge.onHelperActivated(context)
     }
 
     private fun canRequestInstall(context: Context): Boolean =

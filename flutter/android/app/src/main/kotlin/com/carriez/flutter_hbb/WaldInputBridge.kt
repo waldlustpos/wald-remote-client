@@ -68,7 +68,7 @@ object WaldInputBridge {
     private var mainServiceRunning = false
 
     private var bound = false
-    private var disconnectToken = 0 // Android 7 이하 죽은 바인딩 확인용(onServiceDisconnected)
+    private var bindCheckToken = 0 // 죽은 바인딩 확인용(scheduleBindCheck)
     private var receiverRegistered = false
     private var retryDelayMs = 1_000L
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -120,6 +120,7 @@ object WaldInputBridge {
         if (bound) {
             state = State.BINDING
             Log.d(logTag, "binding helper bridge")
+            scheduleBindCheck(10_000L)
         } else {
             state = State.LEGACY
             unbindQuietly(app)
@@ -147,6 +148,40 @@ object WaldInputBridge {
 
     private fun rebindLater(delayMs: Long) {
         mainHandler.postDelayed({ appContext?.let { ensureBound(it) } }, delayMs)
+    }
+
+    /** 바인딩이 죽었다 — 풀고 조금 뒤 다시 바인딩한다. */
+    private fun rebindAfterDeath() {
+        Log.i(logTag, "helper binding died, rebind in ${retryDelayMs}ms")
+        unbind()
+        onStateChanged()
+        rebindLater(retryDelayMs)
+        retryDelayMs = (retryDelayMs * 2).coerceAtMost(60_000L)
+    }
+
+    /**
+     * delayMs 안에 브리지가 연결되지 않으면 죽은 것으로 보고 다시 바인딩한다(부록 A-50 시험). 콜백이 오지 않는 두 경우:
+     * - 도우미 프로세스를 띄우지 못한 바인딩 — 제조사 정책(IM-H092W MediaTek 'process is bad')이 막으면 그대로 BINDING 에 머문다.
+     * - Android 7 이하 강제 종료(onBindingDied 없음 — T2 mini).
+     */
+    private fun scheduleBindCheck(delayMs: Long) {
+        val token = ++bindCheckToken
+        mainHandler.postDelayed({
+            if (token == bindCheckToken && bound && remote == null && state == State.BINDING) rebindAfterDeath()
+        }, delayMs)
+    }
+
+    /** 원격 앱이 도우미를 화면으로 깨웠다(WaldHelper.activateIfStopped) — 막혀 있던 동안 실패한 바인딩을 곧 다시 한다. */
+    fun onHelperActivated(context: Context) {
+        val app = context.applicationContext
+        mainHandler.postDelayed({
+            if (bound && remote == null) {
+                retryDelayMs = 1_000L
+                rebindAfterDeath()
+            }
+            // 시스템도 도우미 접근성 연결을 다시 시도하게 한다(접근성 목록 다시 읽기).
+            if (isHelperListedInSettings(app)) refreshA11yList(app)
+        }, 1_500L)
     }
 
     private val packageReceiver = object : BroadcastReceiver() {
@@ -217,23 +252,13 @@ object WaldInputBridge {
             ready = false
             state = State.BINDING
             onStateChanged()
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                // Android 7 이하는 onBindingDied 가 없다 — 도우미가 강제 종료되면 바인딩이 죽은 채(DEAD) 다시 오지 않는다
-                // (T2 mini 7.1 확인, 부록 A-50 시험). 곧 다시 연결되지 않으면 죽은 것으로 보고 다시 바인딩한다.
-                val token = ++disconnectToken
-                mainHandler.postDelayed({
-                    if (token == disconnectToken && bound && remote == null && state == State.BINDING) onBindingDied(name)
-                }, 5_000L)
-            }
+            // Android 7 이하는 onBindingDied 가 없다 — 도우미가 강제 종료되면 바인딩이 죽은 채(DEAD) 다시 오지 않는다(T2 mini 7.1).
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) scheduleBindCheck(5_000L)
         }
 
         override fun onBindingDied(name: ComponentName?) {
             // 도우미 업데이트·강제 종료 — 다시 바인딩한다(바인딩하면 도우미 stopped 도 풀린다).
-            Log.i(logTag, "helper binding died, rebind in ${retryDelayMs}ms")
-            unbind()
-            onStateChanged()
-            rebindLater(retryDelayMs)
-            retryDelayMs = (retryDelayMs * 2).coerceAtMost(60_000L)
+            rebindAfterDeath()
         }
 
         override fun onNullBinding(name: ComponentName?) {
@@ -289,15 +314,27 @@ object WaldInputBridge {
                 InputService.ctx?.disableSelf()
             }
             pm.setComponentEnabledSetting(component, wanted, PackageManager.DONT_KILL_APP)
-            // 시스템 접근성 목록은 구성요소 하나가 바뀐 것으로는 다시 읽지 않는다(앱 설치·업데이트·삭제·재부팅 때만 — 에뮬레이터 API 34).
-            // 패키지 이름과 같은 이름의 구성요소(manifest activity-alias)도 바꿔(켜짐 기본값 ↔ 켜짐 — 동작은 같다) 바로 다시 읽게 한다.
-            val refresh = ComponentName(context.packageName, context.packageName)
-            val next = if (pm.getComponentEnabledSetting(refresh) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
-                PackageManager.COMPONENT_ENABLED_STATE_DEFAULT else PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            pm.setComponentEnabledSetting(refresh, next, PackageManager.DONT_KILL_APP)
+            refreshA11yList(context)
             Log.i(logTag, "main InputService ${if (hidden) "hidden" else "shown"}")
         } catch (e: Exception) {
             Log.w(logTag, "set main InputService state failed: ${e.message}")
+        }
+    }
+
+    /**
+     * 시스템 접근성 목록을 바로 다시 읽게 한다. 시스템은 구성요소 하나가 바뀐 것으로는 다시 읽지 않는다(앱 설치·업데이트·삭제·재부팅
+     * 때만 — 에뮬레이터 API 34). 패키지 이름과 같은 이름의 구성요소(manifest activity-alias)를 바꾸면(켜짐 기본값 ↔ 켜짐 — 동작은
+     * 같다) '패키지 전체가 바뀜'으로 보고 다시 읽는다 — 켜져 있는데 연결되지 않은 접근성도 이때 다시 연결한다.
+     */
+    private fun refreshA11yList(context: Context) {
+        val pm = context.packageManager
+        val refresh = ComponentName(context.packageName, context.packageName)
+        try {
+            val next = if (pm.getComponentEnabledSetting(refresh) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+                PackageManager.COMPONENT_ENABLED_STATE_DEFAULT else PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            pm.setComponentEnabledSetting(refresh, next, PackageManager.DONT_KILL_APP)
+        } catch (e: Exception) {
+            Log.w(logTag, "accessibility list refresh failed: ${e.message}")
         }
     }
 
