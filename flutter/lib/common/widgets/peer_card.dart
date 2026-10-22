@@ -6,6 +6,7 @@ import 'package:flutter_hbb/common/widgets/wald_ab.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/models/wald_favorites.dart';
 import 'package:flutter_hbb/models/wald_peer_names.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -782,6 +783,7 @@ abstract class BasePeerCard extends StatelessWidget {
               final favs = (await bind.mainGetFav()).toList();
               if (favs.remove(id)) {
                 await bind.mainStoreFav(favs: favs);
+                WaldFavorites.set(favs); // Waldlust(DSK-04, 부록 A-53): 카드 별 상태
                 bind.mainLoadFavPeers();
               }
               break;
@@ -857,6 +859,7 @@ abstract class BasePeerCard extends StatelessWidget {
           if (!favs.contains(id)) {
             favs.add(id);
             await bind.mainStoreFav(favs: favs);
+            WaldFavorites.set(favs); // Waldlust(DSK-04, 부록 A-53): 카드 별 상태
           }
           showToast(translate('Successful'));
         }();
@@ -891,6 +894,7 @@ abstract class BasePeerCard extends StatelessWidget {
           final favs = (await bind.mainGetFav()).toList();
           if (favs.remove(id)) {
             await bind.mainStoreFav(favs: favs);
+            WaldFavorites.set(favs); // Waldlust(DSK-04, 부록 A-53): 카드 별 상태
             await reloadFunc();
           }
           showToast(translate('Successful'));

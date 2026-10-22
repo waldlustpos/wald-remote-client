@@ -9,6 +9,7 @@ import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
+import 'package:flutter_hbb/models/wald_favorites.dart';
 import 'package:flutter_hbb/models/wald_peer_names.dart';
 import 'package:get/get.dart';
 
@@ -62,7 +63,7 @@ Widget waldEditButton(Peer peer, {BaseAb? ab}) {
 }
 
 /// Waldlust(DSK-04): 주소록·최근 세션·즐겨찾기 카드 오른쪽 버튼 — 연결, 파일 전송, (권한이 있으면) 이름 편집,
-/// 그다음 업스트림 더보기 메뉴. 그리드 카드는 이름과 한 줄을 나눠 쓰므로 버튼을 작게 둔다.
+/// 즐겨찾기 별(부록 A-53), 그다음 업스트림 더보기 메뉴. 그리드 카드는 이름과 한 줄을 나눠 쓰므로 버튼을 작게 둔다.
 /// 최근 세션·즐겨찾기(부록 A-17)의 이름 편집은 어드민 기기만, '전체' 주소록의 권한으로 한다(DSK-06).
 Widget waldAbCardActions(
     BuildContext context, Peer peer, PeerTabIndex tab, Widget more) {
@@ -87,18 +88,35 @@ Widget waldAbCardActions(
         translate('Transfer file'),
         () => connectInPeerTab(context, peer, tab, isFileTransfer: true)),
     if (edit != null) edit,
+    _waldFavButton(peer),
     more,
   ]);
 }
 
-Widget _waldCardButton(IconData icon, String tooltip, VoidCallback onTap) {
+/// Waldlust(DSK-04, 부록 A-53): 즐겨찾기 별 — 즐겨찾기면 노란 채운 별, 아니면 회색 외곽선 별.
+/// Lucide 에는 채운 별이 없어(`Icons.star` 도 외곽선으로 바뀐다) 채운 별은 표에 없는 `Icons.star_rounded`(Material)다.
+Widget _waldFavButton(Peer peer) {
+  WaldFavorites.ensureLoaded();
+  return Obx(() {
+    final fav = WaldFavorites.ids.contains(peer.id);
+    return _waldCardButton(
+        fav ? Icons.star_rounded : Icons.star_outline,
+        translate(fav ? 'Remove from Favorites' : 'Add to Favorites'),
+        () => WaldFavorites.toggle(peer.id),
+        color: fav ? WaldPalette.amber500 : WaldPalette.neutral500);
+  });
+}
+
+Widget _waldCardButton(IconData icon, String tooltip, VoidCallback onTap,
+    {Color? color}) {
   return Tooltip(
     message: tooltip,
     child: InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(5),
-        child: Icon(waldIcon(icon), size: WaldSize.iconLg), // 부록 A-17: 18 → 20
+        child: Icon(waldIcon(icon),
+            size: WaldSize.iconLg, color: color), // 부록 A-17: 18 → 20
       ),
     ),
   );

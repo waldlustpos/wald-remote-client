@@ -18,6 +18,7 @@ import 'package:flutter_hbb/models/peer_model.dart';
 
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/models/wald_favorites.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -446,6 +447,7 @@ class _PeerTabPageState extends State<PeerTabPage>
                   favs.remove(p.id);
                 }).toList();
                 await bind.mainStoreFav(favs: favs);
+                WaldFavorites.set(favs); // Waldlust(DSK-04, 부록 A-53): 카드 별 상태
                 bind.mainLoadFavPeers();
                 break;
               case 2:
@@ -486,6 +488,7 @@ class _PeerTabPageState extends State<PeerTabPage>
             }
           }
           await bind.mainStoreFav(favs: favs);
+          WaldFavorites.set(favs); // Waldlust(DSK-04, 부록 A-53): 카드 별 상태
           model.setMultiSelectionMode(false);
           showToast(translate('Successful'));
         },
