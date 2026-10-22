@@ -109,9 +109,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
   /// Callback for the connect button.
   /// Connects to the selected peer.
-  void onConnect() {
+  void onConnect({bool isFileTransfer = false}) {
     var id = _idController.id;
-    connect(context, id);
+    connect(context, id, isFileTransfer: isFileTransfer);
   }
 
   void onFocusChanged() {
@@ -349,6 +349,21 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         icon: Icon(waldIcon(Icons.clear),
                             color: MyTheme.darkGray)),
                   )),
+              // Waldlust(DSK-12, 부록 A-48): 데스크탑처럼 파일 전송을 보조(테두리) 버튼으로 꺼낸다.
+              SizedBox.square(
+                dimension: 44,
+                child: Tooltip(
+                  message: translate('Transfer file'),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size.square(44)),
+                    onPressed: () => onConnect(isFileTransfer: true),
+                    child: Icon(waldIcon(Icons.folder_outlined),
+                        size: WaldSize.iconLg),
+                  ),
+                ),
+              ).marginOnly(right: 8),
               // Waldlust(DSK-07): 데스크탑 [연결] 과 같은 주요(검정) 버튼.
               SizedBox.square(
                 dimension: 44,

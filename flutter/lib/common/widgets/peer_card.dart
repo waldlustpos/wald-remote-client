@@ -973,6 +973,12 @@ class RecentPeerCard extends BasePeerCard {
         !WaldPeerNames.instance.contains(peer.id)) {
       menuItems.add(_renameAction(peer.id));
     }
+    // Waldlust(DSK-12): 세로 카드에는 연필 버튼(가로 전용)이 없어 어드민 기기 이름 편집을 메뉴에 둔다.
+    final waldAb =
+        stateGlobal.isPortrait.isTrue ? waldRenameAllAb(peer) : null;
+    if (waldAb != null) {
+      menuItems.add(waldRenameMenuEntry(peer, menuPadding, ab: waldAb));
+    }
     if (await bind.mainPeerHasPassword(id: peer.id)) {
       menuItems.add(_unrememberPasswordAction(peer.id));
     }
@@ -1038,6 +1044,12 @@ class FavoritePeerCard extends BasePeerCard {
     if ((isMobile || isDesktop || isWebDesktop) &&
         !WaldPeerNames.instance.contains(peer.id)) {
       menuItems.add(_renameAction(peer.id));
+    }
+    // Waldlust(DSK-12): 세로 카드에는 연필 버튼(가로 전용)이 없어 어드민 기기 이름 편집을 메뉴에 둔다.
+    final waldAb =
+        stateGlobal.isPortrait.isTrue ? waldRenameAllAb(peer) : null;
+    if (waldAb != null) {
+      menuItems.add(waldRenameMenuEntry(peer, menuPadding, ab: waldAb));
     }
     if (await bind.mainPeerHasPassword(id: peer.id)) {
       menuItems.add(_unrememberPasswordAction(peer.id));
@@ -1177,6 +1189,13 @@ class AddressBookPeerCard extends BasePeerCard {
         waldCanRename(gFFI.abModel.current)) {
       menuItems.add(MenuEntryDivider());
       menuItems.add(waldRenameMenuEntry(peer, menuPadding));
+    }
+    // Waldlust(DSK-12): 세로 카드에는 즐겨찾기 별 버튼(가로 전용, 부록 A-53)이 없어 메뉴에 둔다.
+    if (stateGlobal.isPortrait.isTrue) {
+      final favs = (await bind.mainGetFav()).toList();
+      menuItems.add(favs.contains(peer.id)
+          ? _rmFavAction(peer.id, () async {})
+          : _addFavAction(peer.id));
     }
     final addressbooks = gFFI.abModel.addressBooksCanWrite();
     if (gFFI.peerTabModel.currentTab == PeerTabIndex.ab.index) {

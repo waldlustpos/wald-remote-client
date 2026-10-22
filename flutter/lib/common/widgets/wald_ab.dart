@@ -45,13 +45,14 @@ void waldRenameAbPeer(Peer peer, {BaseAb? ab}) {
       });
 }
 
-MenuEntryButton<String> waldRenameMenuEntry(Peer peer, EdgeInsets? padding) {
+MenuEntryButton<String> waldRenameMenuEntry(Peer peer, EdgeInsets? padding,
+    {BaseAb? ab}) {
   return MenuEntryButton<String>(
     childBuilder: (TextStyle? style) => Text(
       translate('Rename'),
       style: style,
     ),
-    proc: () => waldRenameAbPeer(peer),
+    proc: () => waldRenameAbPeer(peer, ab: ab),
     padding: padding,
     dismissOnClicked: true,
   );
@@ -72,14 +73,8 @@ Widget waldAbCardActions(
   if (tab == PeerTabIndex.ab) {
     if (waldCanRename(gFFI.abModel.current)) edit = waldEditButton(peer);
   } else {
-    final all = gFFI.abModel.addressbooks.values
-        .where((e) => e.sharedProfile()?.guid == _kAllAbGuid)
-        .firstOrNull;
-    if (all != null &&
-        waldCanRename(all) &&
-        WaldPeerNames.instance.contains(peer.id)) {
-      edit = waldEditButton(peer, ab: all);
-    }
+    final all = waldRenameAllAb(peer);
+    if (all != null) edit = waldEditButton(peer, ab: all);
   }
   return Row(mainAxisSize: MainAxisSize.min, children: [
     _waldCardButton(Icons.screen_share_outlined, translate('Connect'),
@@ -92,6 +87,19 @@ Widget waldAbCardActions(
     _waldFavButton(peer),
     more,
   ]);
+}
+
+/// 최근 세션·즐겨찾기 카드에서 이름을 바꿀 '전체' 주소록. 어드민 기기가 아니거나 권한이 없으면 null(DSK-06).
+BaseAb? waldRenameAllAb(Peer peer) {
+  final all = gFFI.abModel.addressbooks.values
+      .where((e) => e.sharedProfile()?.guid == _kAllAbGuid)
+      .firstOrNull;
+  if (all != null &&
+      waldCanRename(all) &&
+      WaldPeerNames.instance.contains(peer.id)) {
+    return all;
+  }
+  return null;
 }
 
 /// Waldlust(DSK-04, 부록 A-53): 즐겨찾기 별 — 즐겨찾기면 노란 채운 별, 아니면 회색 외곽선 별.
