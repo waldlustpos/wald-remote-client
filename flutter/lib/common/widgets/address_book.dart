@@ -80,7 +80,8 @@ class _AddressBookState extends State<AddressBook> {
     return Row(
       children: [
         Offstage(
-            offstage: hideAbTagsPanel.value,
+            // Waldlust(DSK-04, 부록 A-53): 브랜드 목록은 늘 보인다(저장된 '태그 전환' 값은 쓰지 않는다).
+            offstage: hideAbTagsPanel.value && !waldAbBrandPanel,
             child: Container(
               decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -121,7 +122,7 @@ class _AddressBookState extends State<AddressBook> {
     return Column(
       children: [
         Offstage(
-            offstage: hideAbTagsPanel.value,
+            offstage: hideAbTagsPanel.value && !waldAbBrandPanel, // 부록 A-53
             child: Container(
               decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(6),
