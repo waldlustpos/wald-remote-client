@@ -9,6 +9,7 @@ import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
+import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/wald_favorites.dart';
 import 'package:flutter_hbb/models/wald_peer_names.dart';
 import 'package:get/get.dart';
@@ -140,6 +141,74 @@ final waldAbBrandPanel = true;
 
 const _kAllAbGuid = 'all'; // 서버의 '전체' 주소록(권한 범위 전체 기기)
 
+/// Waldlust(DSK-04, 부록 A-53): 브랜드 목록 패널 폭 — 오른쪽 경계를 끌어 바꾸고, 놓으면 저장한다.
+/// 범위는 160~400, 창이 좁으면 창 너비의 35% 까지(기기 목록이 너무 좁아지지 않게).
+const _kAbPanelWidthOption = 'wald-ab-panel-width';
+const _kAbPanelMinWidth = 160.0;
+const _kAbPanelMaxWidth = 400.0;
+final _waldAbPanelWidth =
+    (double.tryParse(bind.getLocalFlutterOption(k: _kAbPanelWidthOption)) ??
+            200.0)
+        .clamp(_kAbPanelMinWidth, _kAbPanelMaxWidth)
+        .obs;
+
+double waldAbPanelWidth(BuildContext context) => min(_waldAbPanelWidth.value,
+    max(_kAbPanelMinWidth, MediaQuery.of(context).size.width * 0.35));
+
+/// 패널과 기기 목록 사이 12px 여백 자리의 손잡이. 마우스를 올리거나 끄는 동안 가는 세로선을 보인다.
+class WaldAbPanelSplitter extends StatefulWidget {
+  const WaldAbPanelSplitter({Key? key}) : super(key: key);
+
+  @override
+  State<WaldAbPanelSplitter> createState() => _WaldAbPanelSplitterState();
+}
+
+class _WaldAbPanelSplitterState extends State<WaldAbPanelSplitter> {
+  bool _hover = false;
+  double? _dragStart;
+  double _dragDx = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragStart: (_) => setState(() {
+          _dragStart = waldAbPanelWidth(context);
+          _dragDx = 0;
+        }),
+        onHorizontalDragUpdate: (d) {
+          final start = _dragStart;
+          if (start == null) return;
+          _dragDx += d.delta.dx;
+          _waldAbPanelWidth.value =
+              (start + _dragDx).clamp(_kAbPanelMinWidth, _kAbPanelMaxWidth);
+        },
+        onHorizontalDragEnd: (_) {
+          setState(() => _dragStart = null);
+          bind.setLocalFlutterOption(
+              k: _kAbPanelWidthOption,
+              v: _waldAbPanelWidth.value.round().toString());
+        },
+        child: SizedBox(
+          width: 12,
+          height: double.infinity,
+          child: Center(
+            child: Container(
+                width: 1,
+                color: _hover || _dragStart != null
+                    ? WaldPalette.neutral300
+                    : Colors.transparent),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Waldlust(DSK-04, 부록 A-18): 주소록 기기 목록 위에 한 줄 — 전체·활성·비활성 수.
 /// 2026-10-15(부록 A-27): 브랜드명과 '클라이언트'는 뺐다(왼쪽 목록에서 고른 브랜드가 보인다).
 /// 활성은 카드 점과 같은 기준(hbbs 온라인 조회 → `Peer.online`)이고, 조회 결과가 오면 목록 모델이 알린다.
@@ -199,12 +268,22 @@ class WaldAbBrandList extends StatelessWidget {
           abModel.addressbooks[e]?.sharedProfile()?.guid == _kAllAbGuid);
       if (allIndex > 0) names.insert(0, names.removeAt(allIndex));
       final current = abModel.currentName.value;
+      // 부록 A-53: 줄마다 클라이언트 수. 지연 생성되는 itemBuilder 는 Obx 가 추적하지 못해 여기서 미리 센다.
+      // 아직 받지 않은 주소록(로그인 직후 미리 받기 전)은 비운다. 다시 받는 동안은 initialized 가 잠시 false 라
+      // 기기가 있으면 그대로 센다.
+      final counts = names.map((e) {
+        final ab = abModel.addressbooks[e];
+        if (ab == null) return null;
+        final n = ab.peers.length;
+        return n > 0 || ab.initialized ? n : null;
+      }).toList();
       final list = ListView.builder(
           shrinkWrap: isPortrait,
           itemCount: names.length,
           itemBuilder: (context, index) => _buildItem(context, names[index],
               isAll: index == 0 && allIndex >= 0,
-              selected: names[index] == current));
+              selected: names[index] == current,
+              count: counts[index]));
       if (isPortrait) {
         return LimitedBox(
             maxHeight: max(MediaQuery.of(context).size.height / 6, 100.0),
@@ -215,7 +294,7 @@ class WaldAbBrandList extends StatelessWidget {
   }
 
   Widget _buildItem(BuildContext context, String name,
-      {required bool isAll, required bool selected}) {
+      {required bool isAll, required bool selected, int? count}) {
     // 부록 A-18: 선택은 어드민 주소록 화면과 같게 검정 바탕·흰 글자(다크는 밝은 회색·검정 글자), 둥근 모서리, 구분선 없음.
     final wald = WaldColors.of(context);
     final radius = BorderRadius.circular(WaldSize.radius);
@@ -243,12 +322,37 @@ class WaldAbBrandList extends StatelessWidget {
                       color: fg ?? MyTheme.accent, size: 19)
                   .marginOnly(right: 6),
             Expanded(
-                child: Text(gFFI.abModel.translatedName(name),
-                    style: TextStyle(color: fg),
-                    overflow: TextOverflow.ellipsis)),
+                child: _ellipsisWithTooltip(
+                    gFFI.abModel.translatedName(name), TextStyle(color: fg))),
+            // 부록 A-53: 클라이언트 수 — 개수 줄과 같은 크기·투명도.
+            if (count != null)
+              Text('$count',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: (fg ??
+                                  Theme.of(context).textTheme.titleLarge?.color)
+                              ?.withOpacity(0.6)))
+                  .marginOnly(left: 6),
           ],
         ).paddingSymmetric(horizontal: 10, vertical: 8),
       ),
     ).marginSymmetric(horizontal: 8).marginOnly(bottom: 2);
+  }
+
+  /// 부록 A-53: 긴 브랜드 이름이 말줄임되면 마우스를 올렸을 때 전체 이름을 보인다.
+  Widget _ellipsisWithTooltip(String text, TextStyle style) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final t = Text(text, style: style, overflow: TextOverflow.ellipsis);
+      final painter = TextPainter(
+        text: TextSpan(
+            text: text, style: DefaultTextStyle.of(context).style.merge(style)),
+        maxLines: 1,
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: constraints.maxWidth);
+      final cut = painter.didExceedMaxLines;
+      painter.dispose();
+      return cut ? Tooltip(message: text, child: t) : t;
+    });
   }
 }
