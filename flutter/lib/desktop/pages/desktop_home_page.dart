@@ -51,6 +51,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   var watchIsProcessTrust = false;
   var watchIsInputMonitoring = false;
   var watchIsCanRecordAudio = false;
+  (bool, bool, bool)? _waldMacPermissions; // 부록 A-53
   Timer? _updateTimer;
   bool isCardClosed = false;
 
@@ -725,6 +726,19 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
       // Waldlust(DSK-07, 부록 A-41): 서비스가 도는 동안 macOS 메뉴 막대 아이콘을 띄운다.
       await WaldMacStatusItem.sync(serviceRunning: !v);
+      // Waldlust(DSK-07, 부록 A-53): 권한 카드는 [구성]을 누른 뒤에만 다시 확인했다 — 시스템 설정에서 바로 켜도
+      // 카드가 사라지게 매번 확인한다. 화면 기록은 macOS 가 앱을 다시 실행해야 반영한다.
+      if (isMacOS) {
+        final permissions = (
+          bind.mainIsCanScreenRecording(prompt: false),
+          bind.mainIsProcessTrusted(prompt: false),
+          bind.mainIsCanInputMonitoring(prompt: false),
+        );
+        if (permissions != _waldMacPermissions) {
+          _waldMacPermissions = permissions;
+          setState(() {});
+        }
+      }
       if (watchIsCanScreenRecording) {
         if (bind.mainIsCanScreenRecording(prompt: false)) {
           watchIsCanScreenRecording = false;

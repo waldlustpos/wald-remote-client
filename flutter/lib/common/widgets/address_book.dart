@@ -80,14 +80,16 @@ class _AddressBookState extends State<AddressBook> {
     return Row(
       children: [
         Offstage(
-            offstage: hideAbTagsPanel.value,
+            // Waldlust(DSK-04, 부록 A-53): 브랜드 목록은 늘 보인다(저장된 '태그 전환' 값은 쓰지 않는다).
+            offstage: hideAbTagsPanel.value && !waldAbBrandPanel,
             child: Container(
               decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                       color: Theme.of(context).colorScheme.background)),
               child: Container(
-                width: 200,
+                // Waldlust(DSK-04, 부록 A-53): 오른쪽 경계(WaldAbPanelSplitter)를 끌어 폭을 바꾼다.
+                width: waldAbBrandPanel ? waldAbPanelWidth(context) : 200,
                 height: double.infinity,
                 child: Column(
                   // Waldlust(DSK-04): 드롭다운·태그 대신 브랜드 목록(맨 위 '전체').
@@ -110,7 +112,8 @@ class _AddressBookState extends State<AddressBook> {
                   ],
                 ),
               ),
-            ).marginOnly(right: 12.0)),
+            ).marginOnly(right: waldAbBrandPanel ? 0 : 12.0)),
+        if (waldAbBrandPanel) const WaldAbPanelSplitter(), // 12px 여백 자리
         _buildPeersViews()
       ],
     );
@@ -121,7 +124,7 @@ class _AddressBookState extends State<AddressBook> {
     return Column(
       children: [
         Offstage(
-            offstage: hideAbTagsPanel.value,
+            offstage: hideAbTagsPanel.value && !waldAbBrandPanel, // 부록 A-53
             child: Container(
               decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(6),

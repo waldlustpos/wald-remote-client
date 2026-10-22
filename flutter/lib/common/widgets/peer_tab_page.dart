@@ -7,6 +7,7 @@ import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/my_group.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
 import 'package:flutter_hbb/common/widgets/peer_card.dart';
+import 'package:flutter_hbb/common/widgets/wald_ab.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/desktop/widgets/material_mod_popup_menu.dart'
@@ -17,6 +18,7 @@ import 'package:flutter_hbb/models/peer_model.dart';
 
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/models/wald_favorites.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -445,6 +447,7 @@ class _PeerTabPageState extends State<PeerTabPage>
                   favs.remove(p.id);
                 }).toList();
                 await bind.mainStoreFav(favs: favs);
+                WaldFavorites.set(favs); // Waldlust(DSK-04, 부록 A-53): 카드 별 상태
                 bind.mainLoadFavPeers();
                 break;
               case 2:
@@ -485,6 +488,7 @@ class _PeerTabPageState extends State<PeerTabPage>
             }
           }
           await bind.mainStoreFav(favs: favs);
+          WaldFavorites.set(favs); // Waldlust(DSK-04, 부록 A-53): 카드 별 상태
           model.setMultiSelectionMode(false);
           showToast(translate('Successful'));
         },
@@ -605,8 +609,9 @@ class _PeerTabPageState extends State<PeerTabPage>
         offstage: model.currentTab == PeerTabIndex.recent.index,
         child: PeerSortDropdown(),
       ),
+      // Waldlust(DSK-04, 부록 A-53): '태그 전환'은 브랜드 목록을 숨기기만 해서 뺐다 — 목록은 늘 보인다.
       Offstage(
-        offstage: model.currentTab != PeerTabIndex.ab.index,
+        offstage: model.currentTab != PeerTabIndex.ab.index || waldAbBrandPanel,
         child: _toggleTags(),
       ),
     ];
@@ -669,7 +674,8 @@ class _PeerTabPageState extends State<PeerTabPage>
     final List<Widget> dynamicActions = [
       if (model.currentTabCachedPeers.isNotEmpty) _createMultiSelection(),
       if (model.currentTab != PeerTabIndex.recent.index) PeerSortDropdown(),
-      if (model.currentTab == PeerTabIndex.ab.index) _toggleTags()
+      if (model.currentTab == PeerTabIndex.ab.index && !waldAbBrandPanel)
+        _toggleTags() // Waldlust(DSK-04, 부록 A-53)
     ];
     final rightWidth = availableWidth -
         searchWidth -

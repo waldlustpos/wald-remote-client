@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'platform_model.dart';
+import 'wald_favorites.dart';
 import 'wald_peer_names.dart';
 // ignore: depend_on_referenced_packages
 import 'package:collection/collection.dart';
@@ -264,6 +265,8 @@ class Peers extends ChangeNotifier {
     } else {
       peers = _decodePeers(evt['peers']);
     }
+    // Waldlust(DSK-04, 부록 A-53): 접속한 적 없는 주소록 기기 즐겨찾기도 즐겨찾기 탭에 보인다.
+    if (loadEvent == 'load_fav_peers') peers = WaldFavorites.fill(peers);
 
     restPeerIds = [];
     if (evt['ids'] != null) {
