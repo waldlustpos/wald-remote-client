@@ -430,7 +430,7 @@ class MyTheme {
     primaryColor: WaldPalette.neutral900,
     textSelectionTheme: const TextSelectionThemeData(
       cursorColor: WaldPalette.neutral900,
-      selectionColor: WaldPalette.neutral200,
+      selectionColor: WaldPalette.blue200, // 부록 A-53: neutral200 은 입력칸 바탕(neutral100)과 구분되지 않았다.
       selectionHandleColor: WaldPalette.neutral900,
     ),
     // Waldlust(DSK-07): Android 앱바도 어드민 톤 — 흰 바탕·진한 글자·아래 경계선, 상태 표시줄도

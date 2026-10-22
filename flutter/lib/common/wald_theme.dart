@@ -4,6 +4,7 @@
 // neutral 800·950 과 red 950 은 어드민 CSS 에 없어 Tailwind 기본값으로 보탰다(다크 모드용).
 // 주요 버튼과 강조(선택·진행·켜진 토글·체크)는 검정(neutral900), 링크는 본문색 + 밑줄이다(어드민과 같다).
 // 파랑(blue600·700)은 어드민 팔레트와 짝을 맞추려고 남겨 둘 뿐 쓰지 않는다(2026-10-15 — 명세 부록 A-27).
+// blue200 은 입력칸 글자 선택 영역에만 쓴다(2026-10-22 — 부록 A-53, 회색 선택이 입력칸 바탕과 구분되지 않았다).
 // amber700 은 2026-10-21 UI-03(부록 A-49)으로 양쪽 팔레트에 더했다 — 작은 경고 글씨용(흰 바탕 대비 5.05:1, amber600 은 3.2:1).
 // 값 = 어드민 빌드(Lightning CSS)가 Tailwind v4 amber-700 oklch 에 내보내는 hex 대체값 — 다른 색과 같은 규칙이다.
 // 다크 모드는 보류다(MyTheme.getThemeModePreference) — 다크 값은 다시 도입할 때를 위해 남긴다.
@@ -45,6 +46,7 @@ class WaldPalette {
   static const Color amber600 = Color(0xFFDD7400);
   static const Color amber700 = Color(0xFFB75000);
 
+  static const Color blue200 = Color(0xFFBEDBFF);
   static const Color blue600 = Color(0xFF155DFC);
   static const Color blue700 = Color(0xFF1447E6);
 
