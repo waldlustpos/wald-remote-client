@@ -564,6 +564,9 @@ abstract class BasePeerCard extends StatelessWidget {
     );
   }
 
+  // Waldlust(DSK-12): 폰은 원격 제어·파일 전송만 쓴다(G-0) — 카드 메뉴에서 카메라 보기·터미널을 뺀다.
+  bool get _waldCameraTerminal => !isMobile;
+
   @protected
   MenuEntryBase<String> _viewCameraAction(BuildContext context) {
     return _connectCommonAction(
@@ -944,11 +947,11 @@ class RecentPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -1018,11 +1021,11 @@ class FavoritePeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -1087,11 +1090,11 @@ class DiscoveredPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -1147,11 +1150,11 @@ class AddressBookPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -1317,11 +1320,11 @@ class MyGroupPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 

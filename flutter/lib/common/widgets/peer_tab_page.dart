@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:bot_toast/bot_toast.dart';
@@ -710,6 +711,29 @@ class PeerSearchBar extends StatefulWidget {
 
 class _PeerSearchBarState extends State<PeerSearchBar> {
   var drawer = false;
+  // Waldlust(DSK-12): 폰에서는 autofocus 만으로 소프트 키보드가 올라오지 않는다. 검색 칸을 그린 뒤 잠깐 있다가
+  // 포커스를 준다(원격 화면의 키보드 열기와 같은 방식). 포커스 노드는 빌드마다 새로 만들지 않는다.
+  final RxBool _focused = false.obs;
+  final FocusNode _focusNode = FocusNode();
+  Timer? _focusTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      _focused.value = _focusNode.hasFocus;
+      peerSearchTextController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: peerSearchTextController.value.text.length);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusTimer?.cancel();
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -723,6 +747,12 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
               setState(() {
                 drawer = true;
               });
+              if (isMobile) {
+                _focusTimer?.cancel();
+                _focusTimer = Timer(kMobileDelaySoftKeyboardFocus, () {
+                  if (mounted) _focusNode.requestFocus();
+                });
+              }
             },
             child: Icon(
               waldIcon(Icons.search_rounded),
@@ -731,14 +761,8 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
   }
 
   Widget _buildSearchBar() {
-    RxBool focused = false.obs;
-    FocusNode focusNode = FocusNode();
-    focusNode.addListener(() {
-      focused.value = focusNode.hasFocus;
-      peerSearchTextController.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: peerSearchTextController.value.text.length);
-    });
+    final focused = _focused;
+    final focusNode = _focusNode;
     return Obx(() => Container(
           width: stateGlobal.isPortrait.isTrue ? 120 : 140,
           decoration: BoxDecoration(
@@ -756,7 +780,7 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
                     ).marginSymmetric(horizontal: 4),
                     Expanded(
                       child: TextField(
-                        autofocus: true,
+                        autofocus: !isMobile,
                         controller: peerSearchTextController,
                         onChanged: (searchText) {
                           peerSearchText.value = searchText;

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_size_text_field/auto_size_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -238,8 +239,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         minFontSize: 18,
                         autocorrect: false,
                         enableSuggestions: false,
-                        keyboardType: TextInputType.visiblePassword,
-                        // keyboardType: TextInputType.number,
+                        // Waldlust(DSK-12): 원격 ID 는 숫자만 받는다(숫자 키패드). 공백은 IDTextInputFormatter 가 세 자리마다 넣는다.
+                        keyboardType: TextInputType.number,
                         onChanged: (String text) {
                           _idController.id = text;
                         },
@@ -266,7 +267,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
                             color: MyTheme.darkGray,
                           ),
                         ),
-                        inputFormatters: [IDTextInputFormatter()],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
+                          IDTextInputFormatter()
+                        ],
                         onSubmitted: (_) {
                           onConnect();
                         },
