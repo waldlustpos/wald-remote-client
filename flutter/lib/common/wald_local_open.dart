@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -54,7 +55,16 @@ Future<void> _waldOpenLocal(String path, {required bool reveal}) async {
     return;
   }
   try {
-    if (Platform.isMacOS) {
+    if (Platform.isAndroid) {
+      // Waldlust(DSK-12): Android 는 '폴더에서 보기'가 없어 실행 파일(Q-16 (c))은 위치만 알린다.
+      // 그 밖의 파일은 FileProvider 로 기본 앱에 넘긴다(MainActivity 'wald_open_file' → WaldFiles.kt).
+      if (reveal) {
+        showToast(p.dirname(path));
+        return;
+      }
+      final r = await platformFFI.invokeMethod('wald_open_file', path);
+      if (r != 'ok') throw '$r';
+    } else if (Platform.isMacOS) {
       final r = await Process.run('open', reveal ? ['-R', path] : [path]);
       if (r.exitCode != 0) throw '${r.exitCode} ${r.stderr}';
     } else if (Platform.isWindows && !path.contains(',')) {

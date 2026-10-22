@@ -461,8 +461,8 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                   mini: !keyboardIsVisible,
                   child: Icon(
                     (keyboardIsVisible || _showGestureHelp)
-                        ? Icons.expand_more
-                        : Icons.expand_less,
+                        ? waldIcon(Icons.expand_more)
+                        : waldIcon(Icons.expand_less),
                     color: Colors.white,
                   ),
                   backgroundColor: MyTheme.accent,
@@ -563,14 +563,14 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
               children: <Widget>[
                     IconButton(
                       color: Colors.white,
-                      icon: Icon(Icons.clear),
+                      icon: Icon(waldIcon(Icons.clear)),
                       onPressed: () {
                         clientClose(sessionId, gFFI);
                       },
                     ),
                     IconButton(
                       color: Colors.white,
-                      icon: Icon(Icons.tv),
+                      icon: Icon(waldIcon(Icons.tv)),
                       onPressed: () {
                         setState(() => _showEdit = false);
                         showOptions(context, widget.id, gFFI.dialogManager);
@@ -583,11 +583,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                           ? [
                               IconButton(
                                   color: Colors.white,
-                                  icon: Icon(Icons.keyboard),
+                                  icon: Icon(waldIcon(Icons.keyboard)),
                                   onPressed: openKeyboard),
                               IconButton(
                                 color: Colors.white,
-                                icon: const Icon(Icons.build),
+                                icon: Icon(waldIcon(Icons.build)),
                                 onPressed: () => gFFI.dialogManager
                                     .toggleMobileActionsOverlay(ffi: gFFI),
                               )
@@ -595,13 +595,13 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                           : [
                               IconButton(
                                   color: Colors.white,
-                                  icon: Icon(Icons.keyboard),
+                                  icon: Icon(waldIcon(Icons.keyboard)),
                                   onPressed: openKeyboard),
                               IconButton(
                                 color: Colors.white,
                                 icon: Icon(gFFI.ffiModel.touchMode
-                                    ? Icons.touch_app
-                                    : Icons.mouse),
+                                    ? waldIcon(Icons.touch_app)
+                                    : waldIcon(Icons.mouse)),
                                 onPressed: () => setState(
                                     () => _showGestureHelp = !_showGestureHelp),
                               ),
@@ -618,7 +618,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                         ? SvgPicture.asset('assets/chat.svg',
                                             colorFilter: ColorFilter.mode(
                                                 Colors.white, BlendMode.srcIn))
-                                        : Icon(Icons.message),
+                                        : Icon(waldIcon(Icons.message)),
                                     onPressed: () =>
                                         isAndroid && isSupportVoiceCall
                                             ? showChatOptions(widget.id)
@@ -628,7 +628,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                   [
                     IconButton(
                       color: Colors.white,
-                      icon: Icon(Icons.more_vert),
+                      icon: Icon(waldIcon(Icons.more_vert)),
                       onPressed: () {
                         setState(() => _showEdit = false);
                         showActions(widget.id);
@@ -637,7 +637,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                   ]),
           Obx(() => IconButton(
                 color: Colors.white,
-                icon: Icon(Icons.expand_more),
+                icon: Icon(waldIcon(Icons.expand_more)),
                 onPressed: gFFI.ffiModel.waitForFirstImage.isTrue
                     ? null
                     : () {
@@ -835,7 +835,7 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
       VoiceCallStatus.connected
     ].contains(gFFI.chatModel.voiceCallStatus.value);
     final menus = [
-      makeTextMenu('Text chat', Icon(Icons.message, color: MyTheme.accent),
+      makeTextMenu('Text chat', Icon(waldIcon(Icons.message), color: MyTheme.accent),
           () => onPressedTextChat(widget.id)),
       isInVoice
           ? makeTextMenu(
@@ -1023,7 +1023,7 @@ class _KeyHelpToolsState extends State<KeyHelpTools> {
                 () => _pin = !_pin,
               ),
           active: _pin,
-          icon: Icons.push_pin),
+          icon: waldIcon(Icons.push_pin)),
       wrap(
           ' ... ',
           () => setState(
@@ -1096,16 +1096,16 @@ class _KeyHelpToolsState extends State<KeyHelpTools> {
       SizedBox(width: 9999),
       wrap('', () {
         inputModel.inputKey('VK_LEFT');
-      }, icon: Icons.keyboard_arrow_left),
+      }, icon: waldIcon(Icons.keyboard_arrow_left)),
       wrap('', () {
         inputModel.inputKey('VK_UP');
-      }, icon: Icons.keyboard_arrow_up),
+      }, icon: waldIcon(Icons.keyboard_arrow_up)),
       wrap('', () {
         inputModel.inputKey('VK_DOWN');
-      }, icon: Icons.keyboard_arrow_down),
+      }, icon: waldIcon(Icons.keyboard_arrow_down)),
       wrap('', () {
         inputModel.inputKey('VK_RIGHT');
-      }, icon: Icons.keyboard_arrow_right),
+      }, icon: waldIcon(Icons.keyboard_arrow_right)),
       wrap(isMac ? 'Cmd+C' : 'Ctrl+C', () {
         sendPrompt(isMac, 'VK_C');
       }),
