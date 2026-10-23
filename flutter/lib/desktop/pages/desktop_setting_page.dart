@@ -26,6 +26,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/login.dart';
+import '../widgets/wald_update.dart';
 
 const double _kTabWidth = 200;
 const double _kTabHeight = 44; // Waldlust(DSK-07, 부록 A-27): 어드민 사이드바 항목 높이
@@ -2459,6 +2460,8 @@ class _AboutState extends State<_About> {
               SelectionArea(
                   child: Text('${translate('Build Date')}: $buildDate')
                       .marginSymmetric(vertical: 4.0)),
+              // Waldlust(명세 DSK-01): 최신 버전 확인·앱 안 업데이트(직원용 macOS·Windows).
+              if (waldUpdateSupported) const WaldUpdateAboutRow(),
               if (!isWeb)
                 SelectionArea(
                     child: Text('${translate('Fingerprint')}: $fingerprint')

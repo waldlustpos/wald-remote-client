@@ -46,6 +46,9 @@ class WaldMacStatusItem {
     });
   }
 
+  /// 앱 안 업데이트(명세 DSK-01): 번들을 바꾼 뒤 메뉴 막대 '종료'와 같이 끝낸다(src/wald_update.rs 가 새 앱을 연다).
+  static Future<void> quit() => _channel.invokeMethod('quit');
+
   static Future<void> open() async {
     // Dock 아이콘을 먼저 되살려야 창을 앞으로 가져올 때 앱 메뉴도 함께 돌아온다.
     await windowManager.setSkipTaskbar(false);

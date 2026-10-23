@@ -106,6 +106,12 @@ final class WaldStatusItem: NSObject {
     func attach(messenger: FlutterBinaryMessenger) {
         let channel = FlutterMethodChannel(name: "co.kr.waldlust/status_item", binaryMessenger: messenger)
         channel.setMethodCallHandler { [weak self] call, result in
+            // Waldlust(명세 DSK-01 — 앱 안 업데이트): 번들을 바꾼 뒤 메뉴 막대 '종료'와 같이 끝낸다(src/wald_update.rs 가 새 앱을 연다).
+            if call.method == "quit" {
+                result(nil)
+                self?.onQuit()
+                return
+            }
             guard call.method == "update", let args = call.arguments as? [String: Any] else {
                 result(FlutterMethodNotImplemented)
                 return

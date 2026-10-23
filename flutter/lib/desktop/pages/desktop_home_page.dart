@@ -28,6 +28,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
+import '../widgets/wald_update.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -466,15 +467,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               ? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'
               : null);
     }
-    // Waldlust(결정 D37): 어드민이 알려 준 새 버전 — 데스크탑 양방향만(common.dart checkUpdate). [다운로드] = 어드민 '원격
-    // 설치 파일'(로그인), 닫으면 그 버전은 다시 보이지 않는다(로컬 옵션 wald-update-dismissed-<버전>).
+    // Waldlust(결정 D37): 어드민이 알려 준 새 버전 — 데스크탑 양방향만(common.dart checkUpdate). [업데이트] = 앱 안에서 받아
+    // 설치(명세 DSK-01 — desktop/widgets/wald_update.dart), 닫으면 그 버전은 다시 보이지 않는다(로컬 옵션 wald-update-dismissed-<버전>).
     final waldVer = stateGlobal.waldUpdateVersion.value;
     if (waldVer.isNotEmpty &&
         !isCardClosed &&
         !bind.isIncomingOnly() &&
         bind.mainGetLocalOption(key: 'wald-update-dismissed-$waldVer') != 'N') {
-      return buildInstallCard("wald-update-title", "wald-update-{$waldVer}-tip", "Download",
-          () async => await launchUrl(Uri.parse(stateGlobal.waldUpdateUrl.value)),
+      return buildInstallCard("wald-update-title", "wald-update-{$waldVer}-tip", "Update",
+          showWaldUpdateDialog,
           closeButton: true, closeOption: 'wald-update-dismissed-$waldVer');
     }
     if (systemError.isNotEmpty) {
