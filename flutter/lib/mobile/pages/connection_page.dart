@@ -295,10 +295,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
                           fontSize: 30,
                         ),
                         decoration: InputDecoration(
-                          labelText: translate('Remote ID'),
-                          // Waldlust(DSK-12): 라벨을 위로 띄우지 않는다 — 비어 있을 때만 보이고 입력하면 사라진다.
-                          floatingLabelBehavior: FloatingLabelBehavior.never,
-                          // hintText: 'Enter your remote ID',
+                          // Waldlust(DSK-12): 라벨 대신 힌트 — 비어 있을 때만 보이고 입력하면 사라진다. labelText 는 띄우지
+                          // 않아도 위에 떠 있는 라벨 자리를 남겨 글자·커서가 카드 가운데보다 아래로 내려갔다.
+                          hintText: translate('Remote ID'),
                           border: InputBorder.none,
                           // Waldlust(DSK-07): 테마 입력 칸의 채움색을 쓰지 않는다(카드 안 큰 ID 칸).
                           filled: false,
@@ -307,7 +306,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                             fontSize: 16,
                             color: MyTheme.darkGray,
                           ),
-                          labelStyle: const TextStyle(
+                          hintStyle: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                             letterSpacing: 0.2,
