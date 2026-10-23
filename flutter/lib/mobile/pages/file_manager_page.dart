@@ -655,139 +655,143 @@ class _FileManagerViewState extends State<FileManagerView> {
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
           clipBehavior: Clip.antiAlias,
           decoration: waldCardDecoration(),
-          child: ListView.separated(
-            controller: _listScrollController,
-            itemCount: entries.length + 1,
-            separatorBuilder: (context, index) => const Divider(
-                height: 1, thickness: 1, color: WaldPalette.neutral100),
-            itemBuilder: (context, index) {
-              if (index >= entries.length) {
-                return listTail();
-              }
-              final entry = entries[index];
-              var selected = false;
-              if (widget.selectMode.value != SelectMode.none) {
-                selected = _selectedItems.items.contains(entry);
-              }
+          // 행(ListTile)의 선택 바탕·누름 효과는 가까운 Material 에 그려진다 — 카드의 흰 바탕 위에 투명 Material 을 둔다.
+          child: Material(
+            type: MaterialType.transparency,
+            child: ListView.separated(
+              controller: _listScrollController,
+              itemCount: entries.length + 1,
+              separatorBuilder: (context, index) => const Divider(
+                  height: 1, thickness: 1, color: WaldPalette.neutral100),
+              itemBuilder: (context, index) {
+                if (index >= entries.length) {
+                  return listTail();
+                }
+                final entry = entries[index];
+                var selected = false;
+                if (widget.selectMode.value != SelectMode.none) {
+                  selected = _selectedItems.items.contains(entry);
+                }
 
-              final sizeStr =
-                  entry.isFile ? readableFileSize(entry.size.toDouble()) : "";
+                final sizeStr =
+                    entry.isFile ? readableFileSize(entry.size.toDouble()) : "";
 
-              final showCheckBox = () {
-                return widget.selectMode.value != SelectMode.none &&
-                    widget.selectMode.value.eq(controller.selectedItems.isLocal);
-              }();
-              return ListTile(
-                selected: selected,
-                selectedTileColor: WaldPalette.neutral200,
-                selectedColor: WaldPalette.neutral900,
-                leading: Row(mainAxisSize: MainAxisSize.min, children: [
-                  if (showCheckBox && !entry.isDrive)
-                    Checkbox(
-                        visualDensity: VisualDensity.compact,
-                        value: selected,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          if (v && !selected) {
-                            _selectedItems.add(entry);
-                          } else if (!v && selected) {
-                            _selectedItems.remove(entry);
-                          }
-                          setState(() {});
-                        }),
-                  // 종류 아이콘 — 폴더만 주황, 드라이브 n600, 파일 n500(데스크탑과 같다).
-                  waldIconBox(
-                      waldFileEntryIcon(entry.name,
-                          isDir: !entry.isFile, isDrive: entry.isDrive),
-                      color: entry.isDrive
-                          ? WaldPalette.neutral600
-                          : entry.isFile
-                              ? WaldPalette.neutral500
-                              : WaldPalette.amber500),
-                ]),
-                title: Text(entry.name, style: const TextStyle(fontSize: 14)),
-                subtitle: entry.isDrive
-                    ? null
-                    : Text(
-                        [
-                          entry.lastModified().toString().replaceAll(".000", ""),
-                          if (sizeStr.isNotEmpty) sizeStr
-                        ].join(' · '),
-                        style: const TextStyle(
-                            fontSize: WaldSize.smallFont,
-                            color: WaldPalette.neutral500,
-                            fontFeatures: [FontFeature.tabularFigures()]),
-                      ),
-                trailing: entry.isDrive || showCheckBox
-                    ? null
-                    : PopupMenuButton<String>(
-                        tooltip: "",
-                        icon: Icon(waldIcon(Icons.more_vert)),
-                        itemBuilder: (context) {
-                          return [
-                            if (versionCmp(gFFI.ffiModel.pi.version, "1.3.0") >=
-                                0)
-                              PopupMenuItem(
-                                child: Text(translate("Rename")),
-                                value: "rename",
-                              ),
-                            PopupMenuItem(
-                              child: Text(translate("Delete")),
-                              value: "delete",
-                            ),
-                            PopupMenuItem(
-                              child: Text(translate("Select")),
-                              value: "multi_select",
-                            ),
-                          ];
-                        },
-                        onSelected: (v) {
-                          if (v == "delete") {
-                            final items = SelectedItems(isLocal: isLocal);
-                            items.add(entry);
-                            controller.removeAction(items);
-                          } else if (v == "multi_select") {
-                            _selectedItems.clear();
-                            widget.selectMode.toggle(isLocal);
-                            if (widget.selectMode.value != SelectMode.none) {
+                final showCheckBox = () {
+                  return widget.selectMode.value != SelectMode.none &&
+                      widget.selectMode.value.eq(controller.selectedItems.isLocal);
+                }();
+                return ListTile(
+                  selected: selected,
+                  selectedTileColor: WaldPalette.neutral200,
+                  selectedColor: WaldPalette.neutral900,
+                  leading: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (showCheckBox && !entry.isDrive)
+                      Checkbox(
+                          visualDensity: VisualDensity.compact,
+                          value: selected,
+                          onChanged: (v) {
+                            if (v == null) return;
+                            if (v && !selected) {
                               _selectedItems.add(entry);
+                            } else if (!v && selected) {
+                              _selectedItems.remove(entry);
                             }
                             setState(() {});
-                          } else if (v == "rename") {
-                            controller.renameAction(entry, isLocal);
-                          }
-                        }),
-                onTap: () {
-                  if (showCheckBox) {
-                    if (selected) {
-                      _selectedItems.remove(entry);
-                    } else {
-                      _selectedItems.add(entry);
+                          }),
+                    // 종류 아이콘 — 폴더만 주황, 드라이브 n600, 파일 n500(데스크탑과 같다).
+                    waldIconBox(
+                        waldFileEntryIcon(entry.name,
+                            isDir: !entry.isFile, isDrive: entry.isDrive),
+                        color: entry.isDrive
+                            ? WaldPalette.neutral600
+                            : entry.isFile
+                                ? WaldPalette.neutral500
+                                : WaldPalette.amber500),
+                  ]),
+                  title: Text(entry.name, style: const TextStyle(fontSize: 14)),
+                  subtitle: entry.isDrive
+                      ? null
+                      : Text(
+                          [
+                            entry.lastModified().toString().replaceAll(".000", ""),
+                            if (sizeStr.isNotEmpty) sizeStr
+                          ].join(' · '),
+                          style: const TextStyle(
+                              fontSize: WaldSize.smallFont,
+                              color: WaldPalette.neutral500,
+                              fontFeatures: [FontFeature.tabularFigures()]),
+                        ),
+                  trailing: entry.isDrive || showCheckBox
+                      ? null
+                      : PopupMenuButton<String>(
+                          tooltip: "",
+                          icon: Icon(waldIcon(Icons.more_vert)),
+                          itemBuilder: (context) {
+                            return [
+                              if (versionCmp(gFFI.ffiModel.pi.version, "1.3.0") >=
+                                  0)
+                                PopupMenuItem(
+                                  child: Text(translate("Rename")),
+                                  value: "rename",
+                                ),
+                              PopupMenuItem(
+                                child: Text(translate("Delete")),
+                                value: "delete",
+                              ),
+                              PopupMenuItem(
+                                child: Text(translate("Select")),
+                                value: "multi_select",
+                              ),
+                            ];
+                          },
+                          onSelected: (v) {
+                            if (v == "delete") {
+                              final items = SelectedItems(isLocal: isLocal);
+                              items.add(entry);
+                              controller.removeAction(items);
+                            } else if (v == "multi_select") {
+                              _selectedItems.clear();
+                              widget.selectMode.toggle(isLocal);
+                              if (widget.selectMode.value != SelectMode.none) {
+                                _selectedItems.add(entry);
+                              }
+                              setState(() {});
+                            } else if (v == "rename") {
+                              controller.renameAction(entry, isLocal);
+                            }
+                          }),
+                  onTap: () {
+                    if (showCheckBox) {
+                      if (selected) {
+                        _selectedItems.remove(entry);
+                      } else {
+                        _selectedItems.add(entry);
+                      }
+                      setState(() {});
+                      return;
                     }
-                    setState(() {});
-                    return;
-                  }
-                  if (entry.isDirectory || entry.isDrive) {
-                    controller.openDirectory(entry.path);
-                  } else if (isLocal && isAndroid) {
-                    // Waldlust(DSK-12 — DSK-08 모바일판): 이 폰의 파일을 누르면 기본 앱으로 연다.
-                    waldOpenLocalFile(entry.path);
-                  } else {
-                    // Perform file-related tasks.
-                  }
-                },
-                onLongPress: entry.isDrive
-                    ? null
-                    : () {
-                        _selectedItems.clear();
-                        widget.selectMode.toggle(isLocal);
-                        if (widget.selectMode.value != SelectMode.none) {
-                          _selectedItems.add(entry);
-                        }
-                        setState(() {});
-                      },
-              );
-            },
+                    if (entry.isDirectory || entry.isDrive) {
+                      controller.openDirectory(entry.path);
+                    } else if (isLocal && isAndroid) {
+                      // Waldlust(DSK-12 — DSK-08 모바일판): 이 폰의 파일을 누르면 기본 앱으로 연다.
+                      waldOpenLocalFile(entry.path);
+                    } else {
+                      // Perform file-related tasks.
+                    }
+                  },
+                  onLongPress: entry.isDrive
+                      ? null
+                      : () {
+                          _selectedItems.clear();
+                          widget.selectMode.toggle(isLocal);
+                          if (widget.selectMode.value != SelectMode.none) {
+                            _selectedItems.add(entry);
+                          }
+                          setState(() {});
+                        },
+                );
+              },
+            ),
           ),
         );
       }))
