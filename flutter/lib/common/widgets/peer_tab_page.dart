@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:bot_toast/bot_toast.dart';
@@ -699,12 +700,18 @@ class _PeerTabPageState extends State<PeerTabPage>
     } else {
       actions.addAll(dynamicActions);
     }
+    // Waldlust(DSK-12): 폰에서 검색창을 열면 탭은 아이콘만 두고 남는 폭을 검색창이 쓴다
+    // (연결 화면의 흰 패널 안쪽 여백·테두리 (8 + 1) * 2 와 여유 4 를 뺀다).
+    actions[0] = PeerSearchBar(
+        openWidth: max(searchWidth.toDouble(),
+            availableWidth - 18 - 4 - (actions.length - 1) * otherActionWidth));
     return actions;
   }
 }
 
 class PeerSearchBar extends StatefulWidget {
-  const PeerSearchBar({Key? key}) : super(key: key);
+  final double? openWidth;
+  const PeerSearchBar({Key? key, this.openWidth}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _PeerSearchBarState();
@@ -765,7 +772,7 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
     final focused = _focused;
     final focusNode = _focusNode;
     return Obx(() => Container(
-          width: stateGlobal.isPortrait.isTrue ? 120 : 140,
+          width: widget.openWidth ?? (stateGlobal.isPortrait.isTrue ? 120 : 140),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.background,
             borderRadius: BorderRadius.circular(6),
@@ -800,8 +807,10 @@ class _PeerSearchBarState extends State<PeerSearchBar> {
                         decoration: InputDecoration(
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 6),
-                          hintText:
-                              focused.value ? null : translate("Search ID"),
+                          // Waldlust(DSK-12): 폰은 안내 문구를 두지 않는다(좁은 칸에서 'ID …'로 잘린다).
+                          hintText: focused.value || isMobile
+                              ? null
+                              : translate("Search ID"),
                           hintStyle: TextStyle(
                               fontSize: 14, color: Theme.of(context).hintColor),
                           border: InputBorder.none,
