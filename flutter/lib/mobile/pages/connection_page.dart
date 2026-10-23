@@ -241,6 +241,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         enableSuggestions: false,
                         // Waldlust(DSK-12): 원격 ID 는 숫자만 받는다(숫자 키패드). 공백은 IDTextInputFormatter 가 세 자리마다 넣는다.
                         keyboardType: TextInputType.number,
+                        // Waldlust(DSK-12): 칸 밖을 누르면 키패드를 내린다(iOS 숫자 키패드에는 닫기 키가 없다).
+                        // 자동완성 목록은 같은 탭 영역(TextFieldTapRegion)이라 항목 선택은 그대로 된다.
+                        onTapOutside: (_) => fieldFocusNode.unfocus(),
                         onChanged: (String text) {
                           _idController.id = text;
                         },
@@ -251,6 +254,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         ),
                         decoration: InputDecoration(
                           labelText: translate('Remote ID'),
+                          // Waldlust(DSK-12): 라벨을 위로 띄우지 않는다 — 비어 있을 때만 보이고 입력하면 사라진다.
+                          floatingLabelBehavior: FloatingLabelBehavior.never,
                           // hintText: 'Enter your remote ID',
                           border: InputBorder.none,
                           // Waldlust(DSK-07): 테마 입력 칸의 채움색을 쓰지 않는다(카드 안 큰 ID 칸).
@@ -353,6 +358,22 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         icon: Icon(waldIcon(Icons.clear),
                             color: MyTheme.darkGray)),
                   )),
+              // Waldlust(DSK-07): 데스크탑 [연결] 과 같은 주요(검정) 버튼.
+              // DSK-12: 아이콘·순서를 데스크탑([연결] → [파일 전송])과 같게.
+              SizedBox.square(
+                dimension: 44,
+                child: Tooltip(
+                  message: translate('Connect'),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size.square(44)),
+                    onPressed: onConnect,
+                    child: Icon(waldIcon(Icons.screen_share_outlined),
+                        size: WaldSize.iconLg),
+                  ),
+                ),
+              ).marginOnly(right: 8),
               // Waldlust(DSK-12, 부록 A-48): 데스크탑처럼 파일 전송을 보조(테두리) 버튼으로 꺼낸다.
               SizedBox.square(
                 dimension: 44,
@@ -366,18 +387,6 @@ class _ConnectionPageState extends State<ConnectionPage> {
                     child: Icon(waldIcon(Icons.folder_outlined),
                         size: WaldSize.iconLg),
                   ),
-                ),
-              ).marginOnly(right: 8),
-              // Waldlust(DSK-07): 데스크탑 [연결] 과 같은 주요(검정) 버튼.
-              SizedBox.square(
-                dimension: 44,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size.square(44)),
-                  onPressed: onConnect,
-                  child: Icon(waldIcon(Icons.arrow_forward),
-                      size: WaldSize.iconLg),
                 ),
               ).marginOnly(right: 12),
             ],
