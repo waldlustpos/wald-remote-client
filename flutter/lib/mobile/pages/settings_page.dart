@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
+import 'package:flutter_hbb/desktop/widgets/wald_account_button.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
@@ -294,6 +295,62 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
     } else {
       return false;
     }
+  }
+
+  // Waldlust(DSK-12): 설정의 계정 칸(데스크탑 wald_account_button.dart 의 계정 대화상자와 같은 구성).
+  Widget _waldAccountTile() {
+    final user = gFFI.userModel;
+    final handle = user.userName.value;
+    const buttonStyle = ButtonStyle(
+      minimumSize: WidgetStatePropertyAll(Size(0, 38)),
+      padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
+    );
+    if (handle.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: ElevatedButton(
+          style: buttonStyle,
+          onPressed: () => loginDialog(),
+          child: Text(translate('Login')),
+        ),
+      );
+    }
+    final name = user.displayNameOrUserName;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(children: [
+        waldAccountAvatar(size: 40, iconSize: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: WaldPalette.neutral900)),
+              if (handle != name)
+                Text(handle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13, color: WaldPalette.neutral500))
+                    .marginOnly(top: 2),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton(
+          style: buttonStyle,
+          onPressed: logOutConfirmDialog,
+          child: Text(translate('Logout')),
+        ),
+      ]),
+    );
   }
 
   @override
@@ -713,29 +770,9 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
           SettingsSection(
             title: Text(translate('Account')),
             tiles: [
-              SettingsTile(
-                title: Obx(() => Text(gFFI.userModel.userName.value.isEmpty
-                    ? translate('Login')
-                    : '${translate('Logout')} (${gFFI.userModel.accountLabelWithHandle})')),
-                leading: Obx(() {
-                  final avatar = bind.mainResolveAvatarUrl(
-                      avatar: gFFI.userModel.avatar.value);
-                  return buildAvatarWidget(
-                        avatar: avatar,
-                        size: 28,
-                        borderRadius: null,
-                        fallback: Icon(waldIcon(Icons.person)),
-                      ) ??
-                      Icon(waldIcon(Icons.person));
-                }),
-                onPressed: (context) {
-                  if (gFFI.userModel.userName.value.isEmpty) {
-                    loginDialog();
-                  } else {
-                    logOutConfirmDialog();
-                  }
-                },
-              ),
+              // Waldlust(DSK-12): '로그아웃 (이름 (@아이디))' 한 줄 글자 대신 데스크탑 계정 대화상자처럼
+              // 아바타·이름·아이디와 [로그아웃] 버튼을 나눠 둔다. 로그인 전에는 [로그인] 버튼 하나.
+              CustomSettingsTile(child: Obx(() => _waldAccountTile())),
             ],
           ),
         SettingsSection(title: Text(translate("Settings")), tiles: [
