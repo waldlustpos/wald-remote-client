@@ -80,7 +80,9 @@ class _PeerCardState extends State<_PeerCard>
             }
           }
         },
-        onLongPress: () => peerTabModel.select(peer),
+        // Waldlust(DSK-12 — 부록 A-57): 모바일은 여러 개 선택을 쓰지 않는다 — 길게 눌러도 아무 일 없음.
+        // null 로 두면 길게 누름이 탭(접속)으로 처리돼 빈 함수를 둔다.
+        onLongPress: isMobile ? () {} : () => peerTabModel.select(peer),
         child: child);
   }
 
@@ -141,8 +143,9 @@ class _PeerCardState extends State<_PeerCard>
         (hideUsernameOnCard == true
             ? peer.hostname
             : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}');
+    // Waldlust(DSK-12 — 부록 A-57): 폰(세로)도 데스크탑처럼 이름을 부제보다 크게 — 이름 16 : 부제 13 회색.
     final greyStyle = TextStyle(
-        fontSize: 11,
+        fontSize: isPortrait ? 13 : 11,
         color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.6));
     final showNote = _showNote(peer);
 
@@ -194,7 +197,12 @@ class _PeerCardState extends State<_PeerCard>
                             child: Text(
                           peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall,
+                          style: isPortrait
+                              ? Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontSize: 16)
+                              : Theme.of(context).textTheme.titleSmall,
                         )),
                       ]).marginOnly(top: isPortrait ? 0 : 2),
                       Row(
@@ -207,7 +215,7 @@ class _PeerCardState extends State<_PeerCard>
                                 alignment: Alignment.centerLeft,
                                 child: Text(
                                   name,
-                                  style: isPortrait ? null : greyStyle,
+                                  style: greyStyle,
                                   textAlign: TextAlign.start,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -223,7 +231,7 @@ class _PeerCardState extends State<_PeerCard>
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     peer.note,
-                                    style: isPortrait ? null : greyStyle,
+                                    style: greyStyle,
                                     textAlign: TextAlign.start,
                                     overflow: TextOverflow.ellipsis,
                                   ).marginOnly(
@@ -563,6 +571,9 @@ abstract class BasePeerCard extends StatelessWidget {
       isFileTransfer: true,
     );
   }
+
+  // Waldlust(DSK-12): 폰은 원격 제어·파일 전송만 쓴다(G-0) — 카드 메뉴에서 카메라 보기·터미널을 뺀다.
+  bool get _waldCameraTerminal => !isMobile;
 
   @protected
   MenuEntryBase<String> _viewCameraAction(BuildContext context) {
@@ -944,11 +955,11 @@ class RecentPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -972,6 +983,12 @@ class RecentPeerCard extends BasePeerCard {
     if ((isMobile || isDesktop || isWebDesktop) &&
         !WaldPeerNames.instance.contains(peer.id)) {
       menuItems.add(_renameAction(peer.id));
+    }
+    // Waldlust(DSK-12): 세로 카드에는 연필 버튼(가로 전용)이 없어 어드민 기기 이름 편집을 메뉴에 둔다.
+    final waldAb =
+        stateGlobal.isPortrait.isTrue ? waldRenameAllAb(peer) : null;
+    if (waldAb != null) {
+      menuItems.add(waldRenameMenuEntry(peer, menuPadding, ab: waldAb));
     }
     if (await bind.mainPeerHasPassword(id: peer.id)) {
       menuItems.add(_unrememberPasswordAction(peer.id));
@@ -1012,11 +1029,11 @@ class FavoritePeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -1038,6 +1055,12 @@ class FavoritePeerCard extends BasePeerCard {
     if ((isMobile || isDesktop || isWebDesktop) &&
         !WaldPeerNames.instance.contains(peer.id)) {
       menuItems.add(_renameAction(peer.id));
+    }
+    // Waldlust(DSK-12): 세로 카드에는 연필 버튼(가로 전용)이 없어 어드민 기기 이름 편집을 메뉴에 둔다.
+    final waldAb =
+        stateGlobal.isPortrait.isTrue ? waldRenameAllAb(peer) : null;
+    if (waldAb != null) {
+      menuItems.add(waldRenameMenuEntry(peer, menuPadding, ab: waldAb));
     }
     if (await bind.mainPeerHasPassword(id: peer.id)) {
       menuItems.add(_unrememberPasswordAction(peer.id));
@@ -1075,11 +1098,11 @@ class DiscoveredPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -1135,11 +1158,11 @@ class AddressBookPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
@@ -1177,6 +1200,13 @@ class AddressBookPeerCard extends BasePeerCard {
         waldCanRename(gFFI.abModel.current)) {
       menuItems.add(MenuEntryDivider());
       menuItems.add(waldRenameMenuEntry(peer, menuPadding));
+    }
+    // Waldlust(DSK-12): 세로 카드에는 즐겨찾기 별 버튼(가로 전용, 부록 A-53)이 없어 메뉴에 둔다.
+    if (stateGlobal.isPortrait.isTrue) {
+      final favs = (await bind.mainGetFav()).toList();
+      menuItems.add(favs.contains(peer.id)
+          ? _rmFavAction(peer.id, () async {})
+          : _addFavAction(peer.id));
     }
     final addressbooks = gFFI.abModel.addressBooksCanWrite();
     if (gFFI.peerTabModel.currentTab == PeerTabIndex.ab.index) {
@@ -1298,11 +1328,11 @@ class MyGroupPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
-      _terminalAction(context),
+      if (_waldCameraTerminal) _viewCameraAction(context),
+      if (_waldCameraTerminal) _terminalAction(context),
     ];
 
-    if (peer.platform == kPeerPlatformWindows) {
+    if (_waldCameraTerminal && peer.platform == kPeerPlatformWindows) {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 

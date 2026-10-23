@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:toggle_switch/toggle_switch.dart';
 
 import '../../common.dart';
+import '../../common/wald_local_open.dart';
 import '../../common/widgets/dialog.dart';
 
 class FileManagerPage extends StatefulWidget {
@@ -116,7 +117,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
         appBar: AppBar(
           leading: Row(children: [
             IconButton(
-                icon: Icon(Icons.close),
+                icon: Icon(waldIcon(Icons.close)),
                 onPressed: () => clientClose(gFFI.sessionId, gFFI)),
           ]),
           centerTitle: true,
@@ -134,7 +135,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
             fontSize: 15,
             iconSize: 18,
             labels: [translate("Local"), translate("Remote")],
-            icons: [Icons.phone_android_sharp, Icons.screen_share],
+            icons: [waldIcon(Icons.phone_android_sharp), waldIcon(Icons.screen_share)],
             onToggle: (index) {
               final current = showLocal ? 0 : 1;
               if (index != current) {
@@ -145,13 +146,13 @@ class _FileManagerPageState extends State<FileManagerPage> {
           actions: [
             PopupMenuButton<String>(
                 tooltip: "",
-                icon: Icon(Icons.more_vert),
+                icon: Icon(waldIcon(Icons.more_vert)),
                 itemBuilder: (context) {
                   return [
                     PopupMenuItem(
                       child: Row(
                         children: [
-                          Icon(Icons.refresh,
+                          Icon(waldIcon(Icons.refresh),
                               color: Theme.of(context).iconTheme.color),
                           SizedBox(width: 5),
                           Text(translate("Refresh File"))
@@ -163,7 +164,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
                       enabled: currentDir.path != "/",
                       child: Row(
                         children: [
-                          Icon(Icons.check,
+                          Icon(waldIcon(Icons.check),
                               color: Theme.of(context).iconTheme.color),
                           SizedBox(width: 5),
                           Text(translate("Multi Select"))
@@ -175,7 +176,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
                       enabled: currentDir.path != "/",
                       child: Row(
                         children: [
-                          Icon(Icons.folder_outlined,
+                          Icon(waldIcon(Icons.folder_outlined),
                               color: Theme.of(context).iconTheme.color),
                           SizedBox(width: 5),
                           Text(translate("Create Folder"))
@@ -189,8 +190,8 @@ class _FileManagerPageState extends State<FileManagerPage> {
                         children: [
                           Icon(
                               currentOptions.showHidden
-                                  ? Icons.check_box_outlined
-                                  : Icons.check_box_outline_blank,
+                                  ? waldIcon(Icons.check_box_outlined)
+                                  : waldIcon(Icons.check_box_outline_blank),
                               color: Theme.of(context).iconTheme.color),
                           SizedBox(width: 5),
                           Text(translate("Show Hidden Files"))
@@ -291,7 +292,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
             selectedItems.items.isEmpty ||
             selectMode.value.eq(showLocal)) {
           return BottomSheetBody(
-              leading: Icon(Icons.check),
+              leading: Icon(waldIcon(Icons.check)),
               title: translate("Selected"),
               text: selectedItemsLen + localLabel,
               onCanceled: () {
@@ -301,11 +302,11 @@ class _FileManagerPageState extends State<FileManagerPage> {
               },
               actions: [
                 IconButton(
-                  icon: Icon(Icons.compare_arrows),
+                  icon: Icon(waldIcon(Icons.compare_arrows)),
                   onPressed: () => setState(() => showLocal = !showLocal),
                 ),
                 IconButton(
-                  icon: Icon(Icons.delete_forever),
+                  icon: Icon(waldIcon(Icons.delete_forever)),
                   onPressed: selectedItems != null
                       ? () async {
                           if (selectedItems.items.isNotEmpty) {
@@ -320,7 +321,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
               ]);
         } else {
           return BottomSheetBody(
-              leading: Icon(Icons.input),
+              leading: Icon(waldIcon(Icons.input)),
               title: translate("Paste here?"),
               text: selectedItemsLen + localLabel,
               onCanceled: () {
@@ -330,11 +331,11 @@ class _FileManagerPageState extends State<FileManagerPage> {
               },
               actions: [
                 IconButton(
-                  icon: Icon(Icons.compare_arrows),
+                  icon: Icon(waldIcon(Icons.compare_arrows)),
                   onPressed: () => setState(() => showLocal = !showLocal),
                 ),
                 IconButton(
-                  icon: Icon(Icons.paste),
+                  icon: Icon(waldIcon(Icons.paste)),
                   onPressed: () {
                     selectMode.value = SelectMode.none;
                     final otherSide = showLocal
@@ -375,14 +376,14 @@ class _FileManagerPageState extends State<FileManagerPage> {
           );
         case JobState.done:
           return BottomSheetBody(
-            leading: Icon(Icons.check),
+            leading: Icon(waldIcon(Icons.check)),
             title: "${translate("Successful")}!",
             text: activeJob.display(),
             onCanceled: () => jobTable.clear(),
           );
         case JobState.error:
           return BottomSheetBody(
-            leading: Icon(Icons.error),
+            leading: Icon(waldIcon(Icons.error)),
             title: "${translate("Error")}!",
             text: "",
             onCanceled: () => jobTable.clear(),
@@ -484,11 +485,11 @@ class _FileManagerViewState extends State<FileManagerView> {
                                 .iconTheme
                                 .color
                                 ?.withOpacity(0.7)))
+                    // Waldlust(DSK-12): 데스크탑 파일 전송 창과 같은 종류별 아이콘(부록 A-36).
                     : Icon(
-                        entries[index].isFile
-                            ? Icons.feed_outlined
-                            : Icons.folder,
-                        size: 40),
+                        waldFileEntryIcon(entries[index].name,
+                            isDir: !entries[index].isFile),
+                        size: 32),
                 title: Text(entries[index].name),
                 selected: selected,
                 subtitle: entries[index].isDrive
@@ -513,7 +514,7 @@ class _FileManagerViewState extends State<FileManagerView> {
                             })
                         : PopupMenuButton<String>(
                             tooltip: "",
-                            icon: Icon(Icons.more_vert),
+                            icon: Icon(waldIcon(Icons.more_vert)),
                             itemBuilder: (context) {
                               return [
                                 PopupMenuItem(
@@ -565,6 +566,9 @@ class _FileManagerViewState extends State<FileManagerView> {
                   }
                   if (entries[index].isDirectory || entries[index].isDrive) {
                     controller.openDirectory(entries[index].path);
+                  } else if (isLocal && isAndroid) {
+                    // Waldlust(DSK-12 — DSK-08 모바일판): 이 폰의 파일을 누르면 기본 앱으로 연다.
+                    waldOpenLocalFile(entries[index].path);
                   } else {
                     // Perform file-related tasks.
                   }
@@ -621,23 +625,23 @@ class _FileManagerViewState extends State<FileManagerView> {
                 }
                 controller.openDirectory(path);
               }),
-              divider: Icon(Icons.chevron_right),
+              divider: Icon(waldIcon(Icons.chevron_right)),
               overflow: ScrollableOverflow(controller: _breadCrumbScroller),
             );
           })),
           Row(
             children: [
               IconButton(
-                icon: Icon(Icons.arrow_back),
+                icon: Icon(waldIcon(Icons.arrow_back)),
                 onPressed: controller.goBack,
               ),
               IconButton(
-                icon: Icon(Icons.arrow_upward),
+                icon: Icon(waldIcon(Icons.arrow_upward)),
                 onPressed: controller.goToParentDirectory,
               ),
               PopupMenuButton<SortBy>(
                   tooltip: "",
-                  icon: Icon(Icons.sort),
+                  icon: Icon(waldIcon(Icons.sort)),
                   itemBuilder: (context) {
                     return SortBy.values
                         .map((e) => PopupMenuItem(
@@ -690,7 +694,7 @@ class _FileManagerViewState extends State<FileManagerView> {
     final breadCrumbList = [
       BreadCrumbItem(
           content: IconButton(
-        icon: Icon(Icons.home_filled),
+        icon: Icon(waldIcon(Icons.home_filled)),
         onPressed: onHome,
       ))
     ];
@@ -752,7 +756,7 @@ class BottomSheetBody extends StatelessWidget {
                   ),
                   Row(children: () {
                     _actions.add(IconButton(
-                      icon: Icon(Icons.cancel_outlined),
+                      icon: Icon(waldIcon(Icons.cancel_outlined)),
                       onPressed: onCanceled,
                     ));
                     return _actions;

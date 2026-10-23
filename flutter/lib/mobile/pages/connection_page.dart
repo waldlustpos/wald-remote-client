@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_size_text_field/auto_size_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -109,9 +110,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
   /// Callback for the connect button.
   /// Connects to the selected peer.
-  void onConnect() {
+  void onConnect({bool isFileTransfer = false}) {
     var id = _idController.id;
-    connect(context, id);
+    connect(context, id, isFileTransfer: isFileTransfer);
   }
 
   void onFocusChanged() {
@@ -238,8 +239,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         minFontSize: 18,
                         autocorrect: false,
                         enableSuggestions: false,
-                        keyboardType: TextInputType.visiblePassword,
-                        // keyboardType: TextInputType.number,
+                        // Waldlust(DSK-12): 원격 ID 는 숫자만 받는다(숫자 키패드). 공백은 IDTextInputFormatter 가 세 자리마다 넣는다.
+                        keyboardType: TextInputType.number,
                         onChanged: (String text) {
                           _idController.id = text;
                         },
@@ -266,7 +267,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
                             color: MyTheme.darkGray,
                           ),
                         ),
-                        inputFormatters: [IDTextInputFormatter()],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
+                          IDTextInputFormatter()
+                        ],
                         onSubmitted: (_) {
                           onConnect();
                         },
@@ -349,6 +353,21 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         icon: Icon(waldIcon(Icons.clear),
                             color: MyTheme.darkGray)),
                   )),
+              // Waldlust(DSK-12, 부록 A-48): 데스크탑처럼 파일 전송을 보조(테두리) 버튼으로 꺼낸다.
+              SizedBox.square(
+                dimension: 44,
+                child: Tooltip(
+                  message: translate('Transfer file'),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size.square(44)),
+                    onPressed: () => onConnect(isFileTransfer: true),
+                    child: Icon(waldIcon(Icons.folder_outlined),
+                        size: WaldSize.iconLg),
+                  ),
+                ),
+              ).marginOnly(right: 8),
               // Waldlust(DSK-07): 데스크탑 [연결] 과 같은 주요(검정) 버튼.
               SizedBox.square(
                 dimension: 44,

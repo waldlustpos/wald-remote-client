@@ -246,7 +246,7 @@ class _FloatingWheelState extends State<FloatingWheel> {
             },
             () => _isUpDown,
             BorderRadius.vertical(top: Radius.circular(_wheelWidth * 0.5)),
-            Icons.keyboard_arrow_up,
+            waldIcon(Icons.keyboard_arrow_up),
           ),
           Listener(
             onPointerDown: (event) {
@@ -331,7 +331,7 @@ class _FloatingWheelState extends State<FloatingWheel> {
             },
             () => _isDownDown,
             BorderRadius.vertical(bottom: Radius.circular(_wheelWidth * 0.5)),
-            Icons.keyboard_arrow_down,
+            waldIcon(Icons.keyboard_arrow_down),
           ),
         ],
       ),

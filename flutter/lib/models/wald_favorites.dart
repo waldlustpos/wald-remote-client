@@ -48,9 +48,9 @@ class WaldFavorites {
     for (final id in ids) {
       if (!have.add(id)) continue;
       final p = all?.firstWhereOrNull((e) => e.id == id);
-      peers.add(p != null
-          ? Peer.copy(p)
-          : WaldPeerNames.instance.apply(Peer.fromJson({'id': id})));
+      // 주소록 사본은 이름을 바꾼 직후 옛 이름일 수 있어 이름 표(WaldPeerNames)를 다시 씌운다(DSK-12).
+      peers.add(WaldPeerNames.instance
+          .apply(p != null ? Peer.copy(p) : Peer.fromJson({'id': id})));
     }
     return peers;
   }

@@ -45,13 +45,14 @@ void waldRenameAbPeer(Peer peer, {BaseAb? ab}) {
       });
 }
 
-MenuEntryButton<String> waldRenameMenuEntry(Peer peer, EdgeInsets? padding) {
+MenuEntryButton<String> waldRenameMenuEntry(Peer peer, EdgeInsets? padding,
+    {BaseAb? ab}) {
   return MenuEntryButton<String>(
     childBuilder: (TextStyle? style) => Text(
       translate('Rename'),
       style: style,
     ),
-    proc: () => waldRenameAbPeer(peer),
+    proc: () => waldRenameAbPeer(peer, ab: ab),
     padding: padding,
     dismissOnClicked: true,
   );
@@ -72,14 +73,8 @@ Widget waldAbCardActions(
   if (tab == PeerTabIndex.ab) {
     if (waldCanRename(gFFI.abModel.current)) edit = waldEditButton(peer);
   } else {
-    final all = gFFI.abModel.addressbooks.values
-        .where((e) => e.sharedProfile()?.guid == _kAllAbGuid)
-        .firstOrNull;
-    if (all != null &&
-        waldCanRename(all) &&
-        WaldPeerNames.instance.contains(peer.id)) {
-      edit = waldEditButton(peer, ab: all);
-    }
+    final all = waldRenameAllAb(peer);
+    if (all != null) edit = waldEditButton(peer, ab: all);
   }
   return Row(mainAxisSize: MainAxisSize.min, children: [
     _waldCardButton(Icons.screen_share_outlined, translate('Connect'),
@@ -92,6 +87,19 @@ Widget waldAbCardActions(
     _waldFavButton(peer),
     more,
   ]);
+}
+
+/// 최근 세션·즐겨찾기 카드에서 이름을 바꿀 '전체' 주소록. 어드민 기기가 아니거나 권한이 없으면 null(DSK-06).
+BaseAb? waldRenameAllAb(Peer peer) {
+  final all = gFFI.abModel.addressbooks.values
+      .where((e) => e.sharedProfile()?.guid == _kAllAbGuid)
+      .firstOrNull;
+  if (all != null &&
+      waldCanRename(all) &&
+      WaldPeerNames.instance.contains(peer.id)) {
+    return all;
+  }
+  return null;
 }
 
 /// Waldlust(DSK-04, 부록 A-53): 즐겨찾기 별 — 즐겨찾기면 노란 채운 별, 아니면 회색 외곽선 별.
@@ -253,10 +261,95 @@ class _WaldAbCountBar extends StatelessWidget {
   }
 }
 
+/// 브랜드 줄의 클라이언트 수(부록 A-53). 아직 받지 않은 주소록(로그인 직후 미리 받기 전)은 null.
+/// 다시 받는 동안은 initialized 가 잠시 false 라 기기가 있으면 그대로 센다.
+int? _waldAbPeerCount(String name) {
+  final ab = gFFI.abModel.addressbooks[name];
+  if (ab == null) return null;
+  final n = ab.peers.length;
+  return n > 0 || ab.initialized ? n : null;
+}
+
+/// Waldlust(DSK-12 — 부록 A-57): 폰 세로 화면은 브랜드 목록 대신 고른 브랜드 한 줄. 누르면 하단 시트로 전체 목록.
+class WaldAbBrandSelector extends StatelessWidget {
+  const WaldAbBrandSelector({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(WaldSize.radius);
+    final countStyle = TextStyle(
+        fontSize: 13,
+        color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.6));
+    return Obx(() {
+      final abModel = gFFI.abModel;
+      final name = abModel.currentName.value;
+      final isAll =
+          abModel.addressbooks[name]?.sharedProfile()?.guid == _kAllAbGuid;
+      final count = _waldAbPeerCount(name);
+      return InkWell(
+        borderRadius: radius,
+        onTap: () => _showWaldAbBrandSheet(context),
+        child: Container(
+          height: 44,
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(color: MyTheme.color(context).border3!),
+          ),
+          child: Row(children: [
+            if (isAll)
+              Icon(waldIcon(Icons.apps_rounded), color: MyTheme.accent, size: 19)
+                  .marginOnly(right: 6),
+            Expanded(
+                child: Text(abModel.translatedName(name),
+                    overflow: TextOverflow.ellipsis)),
+            if (count != null)
+              Text('$count', style: countStyle).marginOnly(left: 6),
+            Icon(waldIcon(Icons.expand_more), size: WaldSize.iconLg)
+                .marginOnly(left: 4),
+          ]).paddingSymmetric(horizontal: 10),
+        ),
+      );
+    });
+  }
+}
+
+void _showWaldAbBrandSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(WaldSize.dialogRadius))),
+    builder: (context) => ConstrainedBox(
+      // 브랜드가 적으면 내용 높이, 많으면 화면 높이의 90% 까지 펴고 안에서 스크롤한다.
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+              color: WaldPalette.neutral300,
+              borderRadius: BorderRadius.circular(2)),
+        ).marginOnly(top: 10, bottom: 12),
+        Flexible(
+            child: WaldAbBrandList(
+                isPortrait: true, onSelected: () => Navigator.pop(context))),
+        const SizedBox(height: 12),
+      ]),
+    ),
+  );
+}
+
 /// 브랜드(공유 주소록) 목록. 맨 위는 '전체', 나머지는 드롭다운과 같은 이름순. 고르면 오른쪽에 그 기기 목록이 보인다.
+/// 세로(폰)는 하단 시트 안에서만 쓰고(부록 A-57), 줄을 고르면 [onSelected] 로 시트를 닫는다.
 class WaldAbBrandList extends StatelessWidget {
   final bool isPortrait;
-  const WaldAbBrandList({Key? key, required this.isPortrait}) : super(key: key);
+  final VoidCallback? onSelected;
+  const WaldAbBrandList({Key? key, required this.isPortrait, this.onSelected})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -269,14 +362,7 @@ class WaldAbBrandList extends StatelessWidget {
       if (allIndex > 0) names.insert(0, names.removeAt(allIndex));
       final current = abModel.currentName.value;
       // 부록 A-53: 줄마다 클라이언트 수. 지연 생성되는 itemBuilder 는 Obx 가 추적하지 못해 여기서 미리 센다.
-      // 아직 받지 않은 주소록(로그인 직후 미리 받기 전)은 비운다. 다시 받는 동안은 initialized 가 잠시 false 라
-      // 기기가 있으면 그대로 센다.
-      final counts = names.map((e) {
-        final ab = abModel.addressbooks[e];
-        if (ab == null) return null;
-        final n = ab.peers.length;
-        return n > 0 || ab.initialized ? n : null;
-      }).toList();
+      final counts = names.map(_waldAbPeerCount).toList();
       final list = ListView.builder(
           shrinkWrap: isPortrait,
           itemCount: names.length,
@@ -284,11 +370,8 @@ class WaldAbBrandList extends StatelessWidget {
               isAll: index == 0 && allIndex >= 0,
               selected: names[index] == current,
               count: counts[index]));
-      if (isPortrait) {
-        return LimitedBox(
-            maxHeight: max(MediaQuery.of(context).size.height / 6, 100.0),
-            child: list);
-      }
+      // 부록 A-57: 세로는 하단 시트가 높이를 정한다(예전 높이 1/6 제한은 3줄만 보여 뺐다).
+      if (isPortrait) return list;
       return list.marginOnly(top: 8);
     });
   }
@@ -302,6 +385,7 @@ class WaldAbBrandList extends StatelessWidget {
     return InkWell(
       borderRadius: radius,
       onTap: () async {
+        onSelected?.call();
         // 업스트림은 이미 받은 주소록을 다시 받지 않는다. 다른 주소록에서 바꾼 이름이 늦게 보이지 않게 다시 받는다.
         final pulled = gFFI.abModel.addressbooks[name]?.initialized == true;
         await gFFI.abModel.setCurrentName(name);

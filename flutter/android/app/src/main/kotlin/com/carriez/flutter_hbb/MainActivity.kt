@@ -194,6 +194,10 @@ class MainActivity : FlutterActivity() {
                 "wald_helper_install" -> {
                     result.success(WaldHelper.install(this@MainActivity))
                 }
+                // Waldlust(DSK-12): 받은 파일을 기본 앱으로 열기(WaldFiles.kt).
+                "wald_open_file" -> {
+                    result.success(WaldFiles.open(this@MainActivity, call.arguments as? String ?: ""))
+                }
                 "start_capture" -> {
                     mainService?.let {
                         result.success(it.startCapture())

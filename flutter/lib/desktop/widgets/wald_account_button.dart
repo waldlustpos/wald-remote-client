@@ -8,8 +8,15 @@ import '../../consts.dart';
 // Waldlust(DSK-03 — 명세 부록 A-45): 메인 창 앱바의 설정 버튼 왼쪽 계정 버튼.
 // 로그인 여부가 한눈에 보이게 아이콘과 글자를 함께 둔다 — 미로그인 = 회색 사람 아이콘 + '로그인',
 // 로그인 = 검정 원 아이콘 + 계정 이름. 누르면 미로그인은 로그인 대화상자, 로그인은 계정 정보 대화상자.
+// DSK-12(부록 A-57): 폰 홈 앱바 왼쪽에도 쓴다 — 높이·이름 최대 너비만 바꿔 넘긴다.
 class WaldAccountButton extends StatelessWidget {
-  const WaldAccountButton({Key? key}) : super(key: key);
+  final double height;
+  final double maxTextWidth;
+  const WaldAccountButton(
+      {Key? key,
+      this.height = kDesktopRemoteTabBarHeight - 1,
+      this.maxTextWidth = 160})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -24,20 +31,20 @@ class WaldAccountButton extends StatelessWidget {
           hoverColor: tabbar.hoverColor,
           onTap: () => login ? showWaldAccountInfo() : loginDialog(),
           child: SizedBox(
-            height: kDesktopRemoteTabBarHeight - 1,
+            height: height,
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               login
                   ? _avatar(size: 20, iconSize: 13)
                   : Icon(waldIcon(Icons.person_outline),
                       size: WaldSize.iconLg, color: tabbar.unSelectedIconColor),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 160),
+                constraints: BoxConstraints(maxWidth: maxTextWidth),
                 child: Text(
                   login ? userModel.displayNameOrUserName : translate('Login'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: 13,
+                      fontSize: isMobile ? 14 : 13,
                       color: login
                           ? tabbar.selectedTextColor
                           : tabbar.unSelectedTextColor),
