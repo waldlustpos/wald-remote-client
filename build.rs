@@ -164,8 +164,11 @@ fn main() {
     install_android_deps();
     #[cfg(all(windows, feature = "inline"))]
     build_manifest();
+    // Waldlust(DSK-12): 빌드 스크립트의 cfg 는 호스트 기준이라 Windows 에서 Android 를 빌드하면 Windows 코드가 섞인다.
     #[cfg(windows)]
-    build_windows();
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        build_windows();
+    }
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
     if target_os == "macos" {
         #[cfg(target_os = "macos")]
