@@ -358,6 +358,22 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         icon: Icon(waldIcon(Icons.clear),
                             color: MyTheme.darkGray)),
                   )),
+              // Waldlust(DSK-07): 데스크탑 [연결] 과 같은 주요(검정) 버튼.
+              // DSK-12: 아이콘·순서를 데스크탑([연결] → [파일 전송])과 같게.
+              SizedBox.square(
+                dimension: 44,
+                child: Tooltip(
+                  message: translate('Connect'),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size.square(44)),
+                    onPressed: onConnect,
+                    child: Icon(waldIcon(Icons.screen_share_outlined),
+                        size: WaldSize.iconLg),
+                  ),
+                ),
+              ).marginOnly(right: 8),
               // Waldlust(DSK-12, 부록 A-48): 데스크탑처럼 파일 전송을 보조(테두리) 버튼으로 꺼낸다.
               SizedBox.square(
                 dimension: 44,
@@ -371,18 +387,6 @@ class _ConnectionPageState extends State<ConnectionPage> {
                     child: Icon(waldIcon(Icons.folder_outlined),
                         size: WaldSize.iconLg),
                   ),
-                ),
-              ).marginOnly(right: 8),
-              // Waldlust(DSK-07): 데스크탑 [연결] 과 같은 주요(검정) 버튼.
-              SizedBox.square(
-                dimension: 44,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size.square(44)),
-                  onPressed: onConnect,
-                  child: Icon(waldIcon(Icons.arrow_forward),
-                      size: WaldSize.iconLg),
                 ),
               ).marginOnly(right: 12),
             ],
