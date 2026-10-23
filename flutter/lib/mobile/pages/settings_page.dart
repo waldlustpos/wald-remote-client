@@ -51,8 +51,10 @@ class SettingsPage extends StatefulWidget implements PageShape {
   @override
   final icon = Icon(waldIcon(Icons.settings));
 
+  // Waldlust(DSK-12 — 부록 A-58): 폰은 QR 로 서버 설정을 가져오는 스캔 버튼(ScanButton)을 두지 않는다 —
+  // 서버는 빌드에 들어 있고, 바꿀 일이 생기면 'ID/릴레이 서버' 항목으로 고친다.
   @override
-  final appBarActions = bind.isDisableSettings() ? [] : [ScanButton()];
+  final List<Widget> appBarActions = [];
 
   @override
   State<SettingsPage> createState() => _SettingsState();
