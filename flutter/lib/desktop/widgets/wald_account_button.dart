@@ -34,7 +34,7 @@ class WaldAccountButton extends StatelessWidget {
             height: height,
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               login
-                  ? _avatar(size: 20, iconSize: 13)
+                  ? waldAccountAvatar(size: 20, iconSize: 13)
                   : Icon(waldIcon(Icons.person_outline),
                       size: WaldSize.iconLg, color: tabbar.unSelectedIconColor),
               ConstrainedBox(
@@ -58,7 +58,8 @@ class WaldAccountButton extends StatelessWidget {
   }
 }
 
-Widget _avatar({required double size, required double iconSize}) {
+/// 로그인한 계정 아바타(검정 원). 폰 설정의 계정 칸(mobile/pages/settings_page.dart)도 쓴다.
+Widget waldAccountAvatar({required double size, required double iconSize}) {
   return Container(
     width: size,
     height: size,
@@ -85,7 +86,7 @@ void showWaldAccountInfo() {
       content: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 280),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          _avatar(size: 44, iconSize: 24),
+          waldAccountAvatar(size: 44, iconSize: 24),
           Flexible(
             child: Column(
               mainAxisSize: MainAxisSize.min,

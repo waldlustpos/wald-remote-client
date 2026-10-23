@@ -81,6 +81,9 @@ protobuf {
     }
 }
 
+// Waldlust(DSK-12): 발신 전용(직원 폰) 변형 — build.rs·src/wald_variant.rs 와 같은 환경변수 WALDLUST_VARIANT=outgoing.
+def waldOutgoing = System.getenv('WALDLUST_VARIANT') == 'outgoing'
+
 android {
     compileSdkVersion 34
     sourceSets {
@@ -88,6 +91,14 @@ android {
 
         main.proto.srcDirs += '../../../libs/hbb_common/protos'
         main.proto.includes += "message.proto"
+
+        // Waldlust(DSK-12): 발신 전용은 피제어 권한·구성요소를 뺀 매니페스트를 빌드 유형 매니페스트로 쓴다
+        // (main 보다 우선이라 tools:node="remove" 가 먹는다. debug·profile 매니페스트의 INTERNET 은 main 에도 있다).
+        if (waldOutgoing) {
+            ['debug', 'profile', 'release'].each {
+                sourceSets.findByName(it)?.manifest?.srcFile('src/waldOutgoing/AndroidManifest.xml')
+            }
+        }
     }
 
     compileOptions {
@@ -99,9 +110,11 @@ android {
         // Waldlust(Q-29, D35): 공식 RustDesk(com.carriez.flutter_hbb)와 겹치지 않는 자사 ID. Kotlin 네임스페이스(package)는 그대로 둔다.
         applicationId "co.kr.waldlust.remote"
         minSdkVersion 22
-        targetSdkVersion 33
+        // Waldlust(DSK-12): 폰(발신 전용)만 34 — GMS 폰의 Play 프로텍트 사이드로드 차단. 키오스크는 33(D39).
+        targetSdkVersion waldOutgoing ? 34 : 33
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        buildConfigField "boolean", "WALD_OUTGOING", "${waldOutgoing}"
     }
 
     signingConfigs {

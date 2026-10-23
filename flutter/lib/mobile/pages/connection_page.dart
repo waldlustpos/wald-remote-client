@@ -47,6 +47,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
   final AllPeersLoader _allPeersLoader = AllPeersLoader();
 
+  // Waldlust(DSK-12): 연결 화면 맨 위에 보여 주는 내 ID.
+  final RxString _waldMyId = ''.obs;
+
   StreamSubscription? _uniLinksSubscription;
 
   // https://github.com/flutter/flutter/issues/157244
@@ -76,6 +79,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       });
     }
     Get.put<TextEditingController>(_idEditingController);
+    if (isMobile) bind.mainGetMyId().then((id) => _waldMyId.value = id);
   }
 
   @override
@@ -87,6 +91,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
             delegate: SliverChildListDelegate([
           if (!bind.isCustomClient() && !isIOS)
             Obx(() => _buildUpdateUI(stateGlobal.updateUrl.value)),
+          if (isMobile) _buildWaldMyId(),
           _buildRemoteIDTextField(),
         ])),
         SliverFillRemaining(
@@ -156,6 +161,58 @@ class _ConnectionPageState extends State<ConnectionPage> {
                     style: const TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold))));
   }
+
+  // Waldlust(DSK-12): 폰은 원격을 받지 않으니 내 ID 는 보기만 한다(어드민 기기 목록과 맞춰 보는 용도) — 복사만 둔다.
+  // 높이는 ID 를 받기 전부터 잡아 둔다 — 줄이 뒤늦게 생겨 아래 카드가 밀리면 카드의 Ink 바탕만 옛 자리에 남는다.
+  Widget _buildWaldMyId() {
+    return Obx(() {
+      final id = _waldMyId.value;
+      return SizedBox(
+        height: 36,
+        child: id.isEmpty
+            ? null
+            : Row(
+                children: [
+                  Text(translate('My ID'),
+                      style: const TextStyle(
+                          fontSize: 13, color: WaldPalette.neutral500)),
+                  const SizedBox(width: 8),
+                  Text(formatID(id),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: WaldPalette.neutral900,
+                          fontFeatures: [FontFeature.tabularFigures()])),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 16,
+                    color: WaldPalette.neutral500,
+                    icon: Icon(waldIcon(Icons.copy_outlined)),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: id));
+                      showToast(translate('Copied'));
+                    },
+                  ),
+                ],
+              ).paddingOnly(left: 6),
+      );
+    });
+  }
+
+  // Waldlust(DSK-12): '원격 ID' 안내는 칸이 비었을 때만 칸 위에 겹쳐 세로 가운데에 둔다. InputDecoration 의 라벨은
+  // 띄우지 않아도 위에 떠 있는 라벨 자리를 남겨 커서가 내려가고, 힌트는 큰 입력 글자(30)의 기준선에 붙어 가운데보다 아래로 간다.
+  Widget _waldRemoteIdHint() => Obx(() => Offstage(
+        offstage: !_idEmpty.value,
+        child: IgnorePointer(
+          child: Text(translate('Remote ID'),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                letterSpacing: 0.2,
+                color: MyTheme.darkGray,
+              )),
+        ),
+      ));
 
   /// UI for the remote ID TextField.
   /// Search for a peer and connect to it if the id exists.
@@ -233,7 +290,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         VoidCallback onFieldSubmitted) {
                       updateTextAndPreserveSelection(
                           fieldTextEditingController, _idController.text);
-                      return AutoSizeTextField(
+                      final field = AutoSizeTextField(
                         controller: fieldTextEditingController,
                         focusNode: fieldFocusNode,
                         minFontSize: 18,
@@ -253,22 +310,13 @@ class _ConnectionPageState extends State<ConnectionPage> {
                           fontSize: 30,
                         ),
                         decoration: InputDecoration(
-                          labelText: translate('Remote ID'),
-                          // Waldlust(DSK-12): 라벨을 위로 띄우지 않는다 — 비어 있을 때만 보이고 입력하면 사라진다.
-                          floatingLabelBehavior: FloatingLabelBehavior.never,
-                          // hintText: 'Enter your remote ID',
+                          // Waldlust(DSK-12): '원격 ID' 안내는 아래 _waldRemoteIdHint 가 그린다.
                           border: InputBorder.none,
                           // Waldlust(DSK-07): 테마 입력 칸의 채움색을 쓰지 않는다(카드 안 큰 ID 칸).
                           filled: false,
                           helperStyle: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: MyTheme.darkGray,
-                          ),
-                          labelStyle: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            letterSpacing: 0.2,
                             color: MyTheme.darkGray,
                           ),
                         ),
@@ -279,6 +327,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         onSubmitted: (_) {
                           onConnect();
                         },
+                      );
+                      return Stack(
+                        alignment: AlignmentDirectional.centerStart,
+                        children: [field, _waldRemoteIdHint()],
                       );
                     },
                     onSelected: (option) {

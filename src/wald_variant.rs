@@ -1,11 +1,13 @@
-//! Waldlust: 빌드 변형 — 양방향(기본) / 수신 전용(DSK-01·DSK-02).
+//! Waldlust: 빌드 변형 — 양방향(기본) / 수신 전용(DSK-01·DSK-02) / 발신 전용(DSK-12).
 //!
 //! 빌드 환경변수 `WALDLUST_VARIANT=incoming` 으로 만든 수신 전용 빌드는 프로세스가 시작할 때
 //! `res/wald-variant/incoming.json` 의 프리셋(발신 차단·설정 잠금·원격 기능 제한·수락 방식)과
 //! 빌드 때 넣은 공통 영구 비밀번호 해시(`WALDLUST_INCOMING_PW_STORAGE`·`WALDLUST_INCOMING_PW_SALT`,
 //! 평문 아님 — res/wald-variant/preset_hash.py 로 만든다)를 설정 맵에 넣는다. 값은 custom.txt 와
 //! 같은 형식이라 업스트림 분배 로직(`apply_custom_client_config`)이 키마다 맞는 맵에 넣는다.
-//! 두 변형 모두 `res/wald-variant/common.json` 의 공통 프리셋을 먼저 넣는다(DSK-11 — Android 플로팅 창을
+//! `WALDLUST_VARIANT=outgoing`(직원 폰)은 `res/wald-variant/outgoing.json`(conn-type outgoing — 업스트림
+//! `is_outgoing_only()` 가 hbbs 등록·화면 공유를 끈다)만 넣는다. heartbeat 는 그대로 보낸다(폰 ID 확인용).
+//! 모든 변형이 `res/wald-variant/common.json` 의 공통 프리셋을 먼저 넣는다(DSK-11 — Android 플로팅 창을
 //! 투명·터치 통과로). 양방향 빌드는 그 밖에 아무것도 하지 않는다. 환경변수 값 검사는 build.rs 가 한다.
 
 use hbb_common::{
@@ -19,25 +21,37 @@ const INCOMING_PW_STORAGE: Option<&str> = option_env!("WALDLUST_INCOMING_PW_STOR
 const INCOMING_PW_SALT: Option<&str> = option_env!("WALDLUST_INCOMING_PW_SALT");
 const INCOMING_PRESET: &str = include_str!("../res/wald-variant/incoming.json");
 const COMMON_PRESET: &str = include_str!("../res/wald-variant/common.json");
+const OUTGOING_PRESET: &str = include_str!("../res/wald-variant/outgoing.json");
 
 #[inline]
 pub fn is_incoming() -> bool {
     matches!(VARIANT, Some("incoming"))
 }
 
+#[inline]
+pub fn is_outgoing() -> bool {
+    matches!(VARIANT, Some("outgoing"))
+}
+
 /// heartbeat 로 보고하는 변형 이름.
 pub fn name() -> &'static str {
     if is_incoming() {
         "incoming"
+    } else if is_outgoing() {
+        "outgoing"
     } else {
         "bidirectional"
     }
 }
 
-/// 공통 프리셋을, 수신 전용 빌드면 그 프리셋도 적용한다. 프로세스마다 설정 파일을 쓰기 전에 불러야 한다
+/// 공통 프리셋을, 수신 전용·발신 전용 빌드면 그 프리셋도 적용한다. 프로세스마다 설정 파일을 쓰기 전에 불러야 한다
 /// (데스크탑 `global_init()` 첫머리, Android 는 APP_DIR 이 정해진 직후). 여러 번 불러도 한 번만 적용한다.
 pub fn apply() {
     apply_common();
+    if is_outgoing() {
+        apply_outgoing();
+        return;
+    }
     if !is_incoming() {
         return;
     }
@@ -76,6 +90,15 @@ fn apply_common() {
     ONCE.call_once(|| match serde_json::from_str(COMMON_PRESET) {
         Ok(data) => crate::common::apply_custom_client_config(data),
         Err(e) => log::error!("Failed to parse the common preset: {}", e),
+    });
+}
+
+/// 발신 전용 프리셋(DSK-12): 직원 개인 폰은 원격을 받지 않는다.
+fn apply_outgoing() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| match serde_json::from_str(OUTGOING_PRESET) {
+        Ok(data) => crate::common::apply_custom_client_config(data),
+        Err(e) => log::error!("Failed to parse the outgoing-only preset: {}", e),
     });
 }
 
@@ -174,5 +197,18 @@ mod tests {
         ] {
             assert_eq!(LocalConfig::get_option(k), v, "{k}");
         }
+    }
+
+    // 발신 전용 프리셋(DSK-12)은 conn-type 하나뿐이다. 맵에 넣으면 test_incoming_preset_maps 와 HARD 맵의
+    // conn-type 을 두고 병렬로 다투므로 JSON 만 본다.
+    #[test]
+    fn test_outgoing_preset() {
+        let data: HashMap<String, serde_json::Value> =
+            serde_json::from_str(OUTGOING_PRESET).unwrap();
+        assert_eq!(data.len(), 1);
+        assert_eq!(
+            data.get("conn-type").and_then(|v| v.as_str()),
+            Some("outgoing")
+        );
     }
 }
