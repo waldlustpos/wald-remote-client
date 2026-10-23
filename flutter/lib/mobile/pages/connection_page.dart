@@ -241,6 +241,9 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         enableSuggestions: false,
                         // Waldlust(DSK-12): 원격 ID 는 숫자만 받는다(숫자 키패드). 공백은 IDTextInputFormatter 가 세 자리마다 넣는다.
                         keyboardType: TextInputType.number,
+                        // Waldlust(DSK-12): 칸 밖을 누르면 키패드를 내린다(iOS 숫자 키패드에는 닫기 키가 없다).
+                        // 자동완성 목록은 같은 탭 영역(TextFieldTapRegion)이라 항목 선택은 그대로 된다.
+                        onTapOutside: (_) => fieldFocusNode.unfocus(),
                         onChanged: (String text) {
                           _idController.id = text;
                         },
