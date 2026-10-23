@@ -88,9 +88,10 @@ fn check_waldlust_variant() {
         println!("cargo:rerun-if-env-changed={}", key);
     }
     match std::env::var("WALDLUST_VARIANT").unwrap_or_default().as_str() {
-        "" | "bidirectional" => return,
+        // DSK-12: 발신 전용(직원 폰)은 비밀번호 해시·아이콘을 넣지 않는다.
+        "" | "bidirectional" | "outgoing" => return,
         "incoming" => {}
-        _ => panic!("WALDLUST_VARIANT 는 비우거나 bidirectional 또는 incoming 이어야 한다"),
+        _ => panic!("WALDLUST_VARIANT 는 비우거나 bidirectional·incoming·outgoing 이어야 한다"),
     }
     let storage = std::env::var("WALDLUST_INCOMING_PW_STORAGE").unwrap_or_default();
     let salt = std::env::var("WALDLUST_INCOMING_PW_SALT").unwrap_or_default();

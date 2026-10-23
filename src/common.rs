@@ -330,7 +330,7 @@ fn send_waldlust_heartbeat(client: &reqwest::blocking::Client, include_apps: boo
         "uptime": uptime,
         "latencyMs": latency_ms,
         "netType": net_type,
-        "variant": crate::wald_variant::name(), // "bidirectional"/"incoming"
+        "variant": crate::wald_variant::name(), // "bidirectional"/"incoming"/"outgoing"
         // 어드민이 기기가 쓰는 설치 파일을 고를 때 Windows 64·32비트(Sciter)를 가른다 — "x86_64"/"x86"/"aarch64"/"arm"(결정 D37).
         "arch": std::env::consts::ARCH,
     });

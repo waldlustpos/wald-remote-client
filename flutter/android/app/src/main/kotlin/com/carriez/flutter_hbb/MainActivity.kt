@@ -98,6 +98,8 @@ class MainActivity : FlutterActivity() {
             _rdClipboardManager = RdClipboardManager(getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
             FFI.setClipboardManager(_rdClipboardManager!!)
         }
+        // Waldlust(DSK-12): 발신 전용(직원 폰)은 원격을 받지 않는다 — 아래 무인 운용 준비(권한 요청·입력 도우미)를 하지 않는다.
+        if (BuildConfig.WALD_OUTGOING) return
         // Waldlust: 무인 키오스크는 재부팅 후에도 원격이 살아나야 한다.
         // "부팅 시 시작"을 기본 ON 으로 둔다(한 번도 설정된 적 없을 때만 → 운영자가 끈 경우는 존중).
         // 실제 부팅 자동시작은 BootReceiver 가 배터리최적화예외 + 오버레이 권한도 확인하므로,

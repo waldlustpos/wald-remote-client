@@ -824,5 +824,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Active", "활성"),
         ("Inactive", "비활성"),
         ("Open source notices", "오픈소스 고지"),
+        // Waldlust(DSK-12): 폰 연결 화면 맨 위 내 ID(보기만).
+        ("My ID", "내 ID"),
     ].iter().cloned().collect();
 }
