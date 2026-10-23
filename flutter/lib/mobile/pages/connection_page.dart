@@ -163,36 +163,38 @@ class _ConnectionPageState extends State<ConnectionPage> {
   }
 
   // Waldlust(DSK-12): 폰은 원격을 받지 않으니 내 ID 는 보기만 한다(어드민 기기 목록과 맞춰 보는 용도) — 복사만 둔다.
+  // 높이는 ID 를 받기 전부터 잡아 둔다 — 줄이 뒤늦게 생겨 아래 카드가 밀리면 카드의 Ink 바탕만 옛 자리에 남는다.
   Widget _buildWaldMyId() {
     return Obx(() {
       final id = _waldMyId.value;
-      if (id.isEmpty) return const SizedBox.shrink();
       return SizedBox(
         height: 36,
-        child: Row(
-          children: [
-            Text(translate('My ID'),
-                style: const TextStyle(
-                    fontSize: 13, color: WaldPalette.neutral500)),
-            const SizedBox(width: 8),
-            Text(formatID(id),
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: WaldPalette.neutral900,
-                    fontFeatures: [FontFeature.tabularFigures()])),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              iconSize: 16,
-              color: WaldPalette.neutral500,
-              icon: Icon(waldIcon(Icons.copy_outlined)),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: id));
-                showToast(translate('Copied'));
-              },
-            ),
-          ],
-        ).paddingOnly(left: 6),
+        child: id.isEmpty
+            ? null
+            : Row(
+                children: [
+                  Text(translate('My ID'),
+                      style: const TextStyle(
+                          fontSize: 13, color: WaldPalette.neutral500)),
+                  const SizedBox(width: 8),
+                  Text(formatID(id),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: WaldPalette.neutral900,
+                          fontFeatures: [FontFeature.tabularFigures()])),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 16,
+                    color: WaldPalette.neutral500,
+                    icon: Icon(waldIcon(Icons.copy_outlined)),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: id));
+                      showToast(translate('Copied'));
+                    },
+                  ),
+                ],
+              ).paddingOnly(left: 6),
       );
     });
   }
