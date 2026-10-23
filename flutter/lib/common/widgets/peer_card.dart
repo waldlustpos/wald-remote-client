@@ -80,7 +80,9 @@ class _PeerCardState extends State<_PeerCard>
             }
           }
         },
-        onLongPress: () => peerTabModel.select(peer),
+        // Waldlust(DSK-12 — 부록 A-57): 모바일은 여러 개 선택을 쓰지 않는다 — 길게 눌러도 아무 일 없음.
+        // null 로 두면 길게 누름이 탭(접속)으로 처리돼 빈 함수를 둔다.
+        onLongPress: isMobile ? () {} : () => peerTabModel.select(peer),
         child: child);
   }
 
@@ -141,8 +143,9 @@ class _PeerCardState extends State<_PeerCard>
         (hideUsernameOnCard == true
             ? peer.hostname
             : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}');
+    // Waldlust(DSK-12 — 부록 A-57): 폰(세로)도 데스크탑처럼 이름을 부제보다 크게 — 이름 16 : 부제 13 회색.
     final greyStyle = TextStyle(
-        fontSize: 11,
+        fontSize: isPortrait ? 13 : 11,
         color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.6));
     final showNote = _showNote(peer);
 
@@ -194,7 +197,12 @@ class _PeerCardState extends State<_PeerCard>
                             child: Text(
                           peer.alias.isEmpty ? formatID(peer.id) : peer.alias,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall,
+                          style: isPortrait
+                              ? Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontSize: 16)
+                              : Theme.of(context).textTheme.titleSmall,
                         )),
                       ]).marginOnly(top: isPortrait ? 0 : 2),
                       Row(
@@ -207,7 +215,7 @@ class _PeerCardState extends State<_PeerCard>
                                 alignment: Alignment.centerLeft,
                                 child: Text(
                                   name,
-                                  style: isPortrait ? null : greyStyle,
+                                  style: greyStyle,
                                   textAlign: TextAlign.start,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -223,7 +231,7 @@ class _PeerCardState extends State<_PeerCard>
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     peer.note,
-                                    style: isPortrait ? null : greyStyle,
+                                    style: greyStyle,
                                     textAlign: TextAlign.start,
                                     overflow: TextOverflow.ellipsis,
                                   ).marginOnly(

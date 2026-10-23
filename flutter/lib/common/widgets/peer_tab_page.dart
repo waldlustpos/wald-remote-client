@@ -602,7 +602,8 @@ class _PeerTabPageState extends State<PeerTabPage>
       _createRefresh(
           index: PeerTabIndex.group, loading: gFFI.groupModel.groupLoading),
       Offstage(
-        offstage: model.currentTabCachedPeers.isEmpty,
+        // Waldlust(DSK-12 — 부록 A-57): 모바일(폰 가로)은 여러 개 선택 버튼을 두지 않는다.
+        offstage: model.currentTabCachedPeers.isEmpty || isMobile,
         child: _createMultiSelection(),
       ),
       _createPeerViewTypeSwitch(context),
@@ -672,8 +673,8 @@ class _PeerTabPageState extends State<PeerTabPage>
         _createRefresh(
             index: PeerTabIndex.group, loading: gFFI.groupModel.groupLoading),
     ];
+    // Waldlust(DSK-12 — 부록 A-57): 세로(폰)는 여러 개 선택 버튼(_createMultiSelection)을 뺐다.
     final List<Widget> dynamicActions = [
-      if (model.currentTabCachedPeers.isNotEmpty) _createMultiSelection(),
       if (model.currentTab != PeerTabIndex.recent.index) PeerSortDropdown(),
       if (model.currentTab == PeerTabIndex.ab.index && !waldAbBrandPanel)
         _toggleTags() // Waldlust(DSK-04, 부록 A-53)

@@ -120,6 +120,15 @@ class _AddressBookState extends State<AddressBook> {
   }
 
   Widget _buildAddressBookPortrait() {
+    // Waldlust(DSK-12 — 부록 A-57): 세로(폰)는 브랜드 목록 패널 대신 고른 브랜드 한 줄 — 누르면 하단 시트로 목록.
+    if (waldAbBrandPanel) {
+      return Column(
+        children: [
+          const WaldAbBrandSelector().marginOnly(left: 2, right: 2, bottom: 12),
+          _buildPeersViews()
+        ],
+      );
+    }
     const padding = 8.0;
     return Column(
       children: [
