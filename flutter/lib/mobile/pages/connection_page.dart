@@ -199,6 +199,21 @@ class _ConnectionPageState extends State<ConnectionPage> {
     });
   }
 
+  // Waldlust(DSK-12): '원격 ID' 안내는 칸이 비었을 때만 칸 위에 겹쳐 세로 가운데에 둔다. InputDecoration 의 라벨은
+  // 띄우지 않아도 위에 떠 있는 라벨 자리를 남겨 커서가 내려가고, 힌트는 큰 입력 글자(30)의 기준선에 붙어 가운데보다 아래로 간다.
+  Widget _waldRemoteIdHint() => Obx(() => Offstage(
+        offstage: !_idEmpty.value,
+        child: IgnorePointer(
+          child: Text(translate('Remote ID'),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                letterSpacing: 0.2,
+                color: MyTheme.darkGray,
+              )),
+        ),
+      ));
+
   /// UI for the remote ID TextField.
   /// Search for a peer and connect to it if the id exists.
   Widget _buildRemoteIDTextField() {
@@ -275,7 +290,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         VoidCallback onFieldSubmitted) {
                       updateTextAndPreserveSelection(
                           fieldTextEditingController, _idController.text);
-                      return AutoSizeTextField(
+                      final field = AutoSizeTextField(
                         controller: fieldTextEditingController,
                         focusNode: fieldFocusNode,
                         minFontSize: 18,
@@ -295,21 +310,13 @@ class _ConnectionPageState extends State<ConnectionPage> {
                           fontSize: 30,
                         ),
                         decoration: InputDecoration(
-                          // Waldlust(DSK-12): 라벨 대신 힌트 — 비어 있을 때만 보이고 입력하면 사라진다. labelText 는 띄우지
-                          // 않아도 위에 떠 있는 라벨 자리를 남겨 글자·커서가 카드 가운데보다 아래로 내려갔다.
-                          hintText: translate('Remote ID'),
+                          // Waldlust(DSK-12): '원격 ID' 안내는 아래 _waldRemoteIdHint 가 그린다.
                           border: InputBorder.none,
                           // Waldlust(DSK-07): 테마 입력 칸의 채움색을 쓰지 않는다(카드 안 큰 ID 칸).
                           filled: false,
                           helperStyle: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: MyTheme.darkGray,
-                          ),
-                          hintStyle: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            letterSpacing: 0.2,
                             color: MyTheme.darkGray,
                           ),
                         ),
@@ -320,6 +327,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         onSubmitted: (_) {
                           onConnect();
                         },
+                      );
+                      return Stack(
+                        alignment: AlignmentDirectional.centerStart,
+                        children: [field, _waldRemoteIdHint()],
                       );
                     },
                     onSelected: (option) {
