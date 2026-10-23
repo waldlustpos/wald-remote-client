@@ -2,6 +2,7 @@
 # 사용: res/wald-build/collect-notices.sh 가 부른다. 정식 빌드 대상 플랫폼을 모두 넣어 한 번에 모은다(넘치게 넣는 것은 무해).
 targets = [
     "aarch64-apple-darwin",
+    "aarch64-apple-ios",
     "x86_64-pc-windows-msvc",
     "i686-pc-windows-msvc",
     "aarch64-linux-android",

@@ -21,8 +21,8 @@ import zipfile
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLATFORMS = ("macos", "android", "windows-x64", "windows-x86")
-NEEDS_FLUTTER = ("macos", "android", "windows-x64")
+PLATFORMS = ("macos", "android", "ios", "windows-x64", "windows-x86")
+NEEDS_FLUTTER = ("macos", "android", "ios", "windows-x64")
 # vcpkg 가 설치하지만 결과물에 들어가지 않는 빌드 도구 포트
 VCPKG_HOST_PORTS = {"vcpkg", "pkgconf", "aclocal"}
 RULE = "=" * 100

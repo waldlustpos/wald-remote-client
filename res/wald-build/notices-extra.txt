@@ -58,7 +58,7 @@ default_net (https://github.com/rustdesk-org/default_net)
 Git dependency of libs/hbb_common maintained by the RustDesk organization. The repository carries no
 license file or license field; it is distributed here as part of RustDesk.
 
-## platforms: macos android
+## platforms: macos android ios
 ----------------------------------------------------------------------------------------------------
 FFmpeg 7.1 (https://ffmpeg.org/) — built as LGPL-2.1-or-later (no --enable-gpl, no --enable-nonfree).
 Build configuration: res/vcpkg/ffmpeg/portfile.cmake in the source tree of this release
