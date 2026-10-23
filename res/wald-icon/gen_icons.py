@@ -17,10 +17,12 @@ PNG 는 루트 .gitignore 의 *png 에 걸리므로 새로 만든 파일은 git 
 사용(저장소 루트에서, macOS):
   python3 res/wald-icon/gen_icons.py --font <Montserrat[wght].ttf>
   python3 res/wald-icon/gen_icons.py --font <Montserrat[wght].ttf> --variant incoming
+  python3 res/wald-icon/gen_icons.py --font <Montserrat[wght].ttf> --ios-only   # iOS AppIcon 만
 필요: Pillow, iconutil(macOS 기본 도구, .icns 생성)
 """
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -57,6 +59,7 @@ CENTER_Y = 512.0
 CORNER = 180 / 1024  # 기존 아이콘의 둥근 모서리 반지름(캔버스 대비)
 MAC_BODY = 824 / 1024  # macOS 아이콘 격자: 1024 캔버스 안 824 몸체
 MAC_CORNER = 185.4 / 824
+IOS_ICONSET = "flutter/ios/Runner/Assets.xcassets/AppIcon.appiconset"
 
 SS = 2048  # 그릴 때의 해상도. 원하는 크기로 줄여 안티앨리어싱한다.
 
@@ -144,6 +147,7 @@ def _rounded(size, box, radius, color):
 
 def render(px, kind, font_path, with_text=None, badge=False):
     """kind: 'square'(꽉 찬 둥근 사각형) | 'mac'(macOS 격자, 그림자 포함) | 'glyph'(투명 배경, 흰 글자)
+          | 'ios'(모서리 없는 꽉 찬 정사각형 — 모서리는 iOS 가 깎는다)
     badge: 수신 전용 배지(square·glyph 만, BADGE_MIN 이상)"""
     if with_text is None:
         with_text = px > SMALL_MAX
@@ -164,6 +168,9 @@ def render(px, kind, font_path, with_text=None, badge=False):
         shadow = shadow.filter(ImageFilter.GaussianBlur(0.012 * n))
         img = Image.alpha_composite(shadow, _rounded(n, box, MAC_CORNER * body, BG))
         _draw_content(img, font_path, with_text, FG, scale=MAC_BODY, offset=(512 * (1 - MAC_BODY),) * 2)
+    elif kind == "ios":
+        img = Image.new("RGBA", (n, n), BG)
+        _draw_content(img, font_path, with_text, FG)
     elif kind == "glyph":
         # Android 적응형 foreground: 108dp 중 가운데 72dp 가 보이므로 2/3 로 줄인다.
         img = Image.new("RGBA", (n, n), (0, 0, 0, 0))
@@ -235,6 +242,15 @@ def save_icns(path, font_path, kind="mac"):
         shutil.rmtree(tmp)
 
 
+def save_ios(iconset, font_path):
+    """Contents.json 의 크기·파일명 그대로 덮어쓴다. iOS 앱 아이콘은 알파가 없어야 한다."""
+    with open(os.path.join(iconset, "Contents.json"), encoding="utf-8") as fp:
+        images = json.load(fp)["images"]
+    for e in images:
+        px = round(float(e["size"].split("x")[0]) * int(e["scale"].rstrip("x")))
+        render(px, "ios", font_path).convert("RGB").save(os.path.join(iconset, e["filename"]))
+
+
 ANDROID_DENSITIES = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
 
 
@@ -264,11 +280,15 @@ def main():
     ap.add_argument("--root", default=".", help="저장소 루트")
     ap.add_argument("--mac-kind", default="mac", choices=["mac", "square"])
     ap.add_argument("--variant", default="bidirectional", choices=["bidirectional", "incoming"])
+    ap.add_argument("--ios-only", action="store_true", help="iOS AppIcon 만 쓴다")
     a = ap.parse_args()
     if a.variant == "incoming":
         save_incoming(a.root, a.font)
         return
     r = lambda *p: os.path.join(a.root, *p)
+    save_ios(r(IOS_ICONSET), a.font)
+    if a.ios_only:
+        return
 
     save_icns(r("flutter/macos/Runner/AppIcon.icns"), a.font, a.mac_kind)
     save_ico(r("flutter/windows/runner/resources/app_icon.ico"), a.font)
