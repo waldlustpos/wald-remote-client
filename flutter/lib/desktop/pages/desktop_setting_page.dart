@@ -12,6 +12,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
+import 'package:flutter_hbb/desktop/widgets/wald_account_button.dart';
 import 'package:flutter_hbb/mobile/widgets/dialog.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/printer_model.dart';
@@ -2094,82 +2095,49 @@ class _AccountState extends State<_Account> {
     return ListView(
       controller: scrollController,
       children: [
-        _Card(title: 'Account', children: [accountAction(), useInfo()]),
+        _Card(title: 'Account', children: [accountAction()]),
       ],
     ).marginOnly(bottom: _kListViewBottomMargin);
   }
 
+  // Waldlust(DSK-03): '로그아웃 (이름 (@아이디))' 버튼과 정보 상자 대신 폰 설정의 계정 칸(DSK-12)처럼
+  // 아바타·이름·아이디와 [로그아웃] 버튼을 한 줄에 둔다. 로그인 전에는 [로그인] 버튼 하나.
   Widget accountAction() {
-    return Obx(() => _Button(
-        gFFI.userModel.userName.value.isEmpty
-            ? 'Login'
-            : '${translate('Logout')} (${gFFI.userModel.accountLabelWithHandle})',
-        () => {
-              gFFI.userModel.userName.value.isEmpty
-                  ? loginDialog()
-                  : logOutConfirmDialog()
-            }));
-  }
-
-  Widget useInfo() {
-    return Obx(() => Offstage(
-          offstage: gFFI.userModel.userName.value.isEmpty,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Builder(builder: (context) {
-              final avatarWidget = _buildUserAvatar();
-              return Row(
-                children: [
-                  if (avatarWidget != null) avatarWidget,
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          gFFI.userModel.displayNameOrUserName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        SelectionArea(
-                          child: Text(
-                            '@${gFFI.userModel.userName.value}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color:
-                                  Theme.of(context).textTheme.bodySmall?.color,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }),
+    return Obx(() {
+      final user = gFFI.userModel;
+      final handle = user.userName.value;
+      if (handle.isEmpty) return _Button('Login', () => loginDialog());
+      final name = user.displayNameOrUserName;
+      return Row(children: [
+        waldAccountAvatar(size: 40, iconSize: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: WaldPalette.neutral900)),
+              if (handle != name)
+                SelectableText(handle,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 13, color: WaldPalette.neutral500))
+                    .marginOnly(top: 2),
+            ],
           ),
-        )).marginOnly(left: 18, top: 16);
-  }
-
-  Widget? _buildUserAvatar() {
-    // Resolve relative avatar path at display time
-    final avatar =
-        bind.mainResolveAvatarUrl(avatar: gFFI.userModel.avatar.value);
-    return buildAvatarWidget(
-      avatar: avatar,
-      size: 44,
-    );
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton(
+          onPressed: logOutConfirmDialog,
+          child: Text(translate('Logout'), strutStyle: waldButtonStrut()),
+        ),
+      ]).marginOnly(left: _kContentHMargin);
+    });
   }
 }
 
