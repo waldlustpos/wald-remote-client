@@ -1,14 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:extended_text/extended_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_breadcrumb/flutter_breadcrumb.dart';
 import 'package:flutter_hbb/models/file_model.dart';
 import 'package:get/get.dart';
-import 'package:toggle_switch/toggle_switch.dart';
+import 'package:percent_indicator/percent_indicator.dart';
 
 import '../../common.dart';
 import '../../common/wald_local_open.dart';
 import '../../common/widgets/dialog.dart';
+
+// Waldlust(DSK-12): 디자인 미리보기(test/wald_phone_preview.dart)는 연결 없이 화면만 띄운다.
+@visibleForTesting
+bool waldMobileFileManagerPreview = false;
 
 class FileManagerPage extends StatefulWidget {
   FileManagerPage(
@@ -77,6 +83,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
   @override
   void initState() {
     super.initState();
+    if (waldMobileFileManagerPreview) return;
     gFFI.start(widget.id,
         isFileTransfer: true,
         password: widget.password,
@@ -92,11 +99,13 @@ class _FileManagerPageState extends State<FileManagerPage> {
 
   @override
   void dispose() {
-    model.close().whenComplete(() {
-      gFFI.close();
-      gFFI.dialogManager.dismissAll();
-      WakelockManager.disable(_uniqueKey);
-    });
+    if (!waldMobileFileManagerPreview) {
+      model.close().whenComplete(() {
+        gFFI.close();
+        gFFI.dialogManager.dismissAll();
+        WakelockManager.disable(_uniqueKey);
+      });
+    }
     model.jobController.clear();
     super.dispose();
   }
@@ -113,7 +122,8 @@ class _FileManagerPageState extends State<FileManagerPage> {
         return false;
       },
       child: Scaffold(
-        // backgroundColor: MyTheme.grayBg,
+        // Waldlust(DSK-12 — 부록 A-58): 회색 바탕 위 흰 목록 카드(데스크탑 파일 전송 창 톤).
+        backgroundColor: Theme.of(context).colorScheme.background,
         appBar: AppBar(
           leading: Row(children: [
             IconButton(
@@ -121,28 +131,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
                 onPressed: () => clientClose(gFFI.sessionId, gFFI)),
           ]),
           centerTitle: true,
-          title: ToggleSwitch(
-            initialLabelIndex: showLocal ? 0 : 1,
-            activeBgColor: [MyTheme.idColor],
-            inactiveBgColor: Theme.of(context).brightness == Brightness.light
-                ? MyTheme.grayBg
-                : null,
-            inactiveFgColor: Theme.of(context).brightness == Brightness.light
-                ? Colors.black54
-                : null,
-            totalSwitches: 2,
-            minWidth: 100,
-            fontSize: 15,
-            iconSize: 18,
-            labels: [translate("Local"), translate("Remote")],
-            icons: [waldIcon(Icons.phone_android_sharp), waldIcon(Icons.screen_share)],
-            onToggle: (index) {
-              final current = showLocal ? 0 : 1;
-              if (index != current) {
-                setState(() => showLocal = !showLocal);
-              }
-            },
-          ),
+          title: _waldSideTabs(),
           actions: [
             PopupMenuButton<String>(
                 tooltip: "",
@@ -155,7 +144,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
                           Icon(waldIcon(Icons.refresh),
                               color: Theme.of(context).iconTheme.color),
                           SizedBox(width: 5),
-                          Text(translate("Refresh File"))
+                          Text(translate("Refresh"))
                         ],
                       ),
                       value: "refresh",
@@ -167,7 +156,7 @@ class _FileManagerPageState extends State<FileManagerPage> {
                           Icon(waldIcon(Icons.check),
                               color: Theme.of(context).iconTheme.color),
                           SizedBox(width: 5),
-                          Text(translate("Multi Select"))
+                          Text(translate("Select"))
                         ],
                       ),
                       value: "select",
@@ -274,128 +263,336 @@ class _FileManagerPageState extends State<FileManagerPage> {
                 controller: model.remoteController,
                 selectMode: selectMode,
               ),
-        bottomSheet: bottomSheet(),
+        bottomNavigationBar: bottomSheet(),
       ));
 
+  // Waldlust(DSK-12 — 부록 A-58): 하늘색 로컬·원격 토글 대신 둘로 나뉜 탭(고른 쪽 검정 바탕·흰 글자 —
+  // 브랜드 목록 선택과 같은 규칙).
+  Widget _waldSideTabs() {
+    Widget tab(bool local) {
+      final selected = showLocal == local;
+      final color = selected ? WaldPalette.white : WaldPalette.neutral700;
+      return InkWell(
+        borderRadius: BorderRadius.circular(WaldSize.radius - 2),
+        onTap: selected ? null : _waldSwitchSide,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected ? WaldPalette.neutral900 : null,
+            borderRadius: BorderRadius.circular(WaldSize.radius - 2),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(waldIcon(local ? Icons.phone_android_sharp : Icons.computer),
+                size: WaldSize.iconSm, color: color),
+            const SizedBox(width: 6),
+            Text(translate(local ? 'My phone' : 'Remote device'),
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w500, color: color)),
+          ]),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: WaldPalette.neutral100,
+        borderRadius: BorderRadius.circular(WaldSize.radius),
+      ),
+      child: Row(
+          mainAxisSize: MainAxisSize.min, children: [tab(true), tab(false)]),
+    );
+  }
+
+  // 고른 채로 탭을 바꾸면 선택을 푼다 — 보내기는 선택 막대에서 바로 하므로 붙여넣기 단계가 없다.
+  void _waldSwitchSide() {
+    model.localController.selectedItems.clear();
+    model.remoteController.selectedItems.clear();
+    selectMode.value = SelectMode.none;
+    setState(() => showLocal = !showLocal);
+  }
+
+  // Waldlust(DSK-12 — 부록 A-58): 반투명 하단 시트(목록을 가림) → 흰 하단 막대. 선택 중이면 고른 개수·받는 위치·
+  // [삭제]·[보내기|받기](데스크탑처럼 반대편의 지금 폴더로 바로), 아니면 전송 작업 하나(진행 중인 것, 없으면 마지막).
   Widget? bottomSheet() {
     return Obx(() {
-      final selectedItems = getActiveSelectedItems();
-      final jobTable = model.jobController.jobTable;
+      final child = selectMode.value != SelectMode.none
+          ? _waldSelectionBar()
+          : _waldJobBar();
+      if (child == null) return const SizedBox.shrink();
+      return Container(
+        decoration: const BoxDecoration(
+          color: WaldPalette.white,
+          border: Border(top: BorderSide(color: WaldPalette.neutral200)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: child,
+          ),
+        ),
+      );
+    });
+  }
 
-      final localLabel = selectedItems?.isLocal == null
-          ? ""
-          : " [${selectedItems!.isLocal ? translate("Local") : translate("Remote")}]";
-      if (!(selectMode.value == SelectMode.none)) {
-        final selectedItemsLen =
-            "${selectedItems?.items.length ?? 0} ${translate("items")}";
-        if (selectedItems == null ||
-            selectedItems.items.isEmpty ||
-            selectMode.value.eq(showLocal)) {
-          return BottomSheetBody(
-              leading: Icon(waldIcon(Icons.check)),
-              title: translate("Selected"),
-              text: selectedItemsLen + localLabel,
-              onCanceled: () {
-                selectedItems?.items.clear();
-                selectMode.value = SelectMode.none;
-                setState(() {});
-              },
-              actions: [
-                IconButton(
-                  icon: Icon(waldIcon(Icons.compare_arrows)),
-                  onPressed: () => setState(() => showLocal = !showLocal),
-                ),
-                IconButton(
-                  icon: Icon(waldIcon(Icons.delete_forever)),
-                  onPressed: selectedItems != null
-                      ? () async {
-                          if (selectedItems.items.isNotEmpty) {
-                            await currentFileController
-                                .removeAction(selectedItems);
-                            selectedItems.items.clear();
-                            selectMode.value = SelectMode.none;
-                          }
-                        }
-                      : null,
-                )
-              ]);
-        } else {
-          return BottomSheetBody(
-              leading: Icon(waldIcon(Icons.input)),
-              title: translate("Paste here?"),
-              text: selectedItemsLen + localLabel,
-              onCanceled: () {
-                selectedItems.items.clear();
-                selectMode.value = SelectMode.none;
-                setState(() {});
-              },
-              actions: [
-                IconButton(
-                  icon: Icon(waldIcon(Icons.compare_arrows)),
-                  onPressed: () => setState(() => showLocal = !showLocal),
-                ),
-                IconButton(
-                  icon: Icon(waldIcon(Icons.paste)),
-                  onPressed: () {
-                    selectMode.value = SelectMode.none;
-                    final otherSide = showLocal
-                        ? model.remoteController
-                        : model.localController;
-                    final thisSideData =
-                        DirectoryData(currentDir, currentOptions);
-                    otherSide.sendFiles(selectedItems, thisSideData);
-                    selectedItems.items.clear();
+  Widget _waldSelectionBar() {
+    final controller = currentFileController;
+    final selected = controller.selectedItems;
+    final count = selected.items.length;
+    final entries = currentDir.entries.where((e) => !e.isDrive).toList();
+    final allSelected = entries.isNotEmpty && count >= entries.length;
+    final otherSide = showLocal ? model.remoteController : model.localController;
+    const buttonSize = Size(0, 40);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [
+          Expanded(
+            child: Text(translate('{$count} selected'),
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: WaldPalette.neutral900)),
+          ),
+          TextButton(
+            onPressed: entries.isEmpty
+                ? null
+                : () {
+                    if (allSelected) {
+                      selected.clear();
+                    } else {
+                      selected.selectAll(entries);
+                    }
+                    setState(() {});
+                  },
+            child: Text(translate(allSelected ? 'Unselect All' : 'Select All')),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: Icon(waldIcon(Icons.close), size: WaldSize.iconLg),
+            onPressed: () {
+              selected.clear();
+              selectMode.value = SelectMode.none;
+              setState(() {});
+            },
+          ),
+        ]),
+        Row(children: [
+          Text(
+              '${translate('Destination')} · ${translate(showLocal ? 'Remote device' : 'My phone')}',
+              style: const TextStyle(
+                  fontSize: WaldSize.smallFont, color: WaldPalette.neutral500)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ExtendedText(
+              otherSide.directory.value.path,
+              maxLines: 1,
+              style: const TextStyle(
+                  fontSize: WaldSize.smallFont, color: WaldPalette.neutral700),
+              overflowWidget: const TextOverflowWidget(
+                  child: Text('…'), position: TextOverflowPosition.start),
+            ),
+          ),
+        ]).marginOnly(bottom: 10),
+        Row(children: [
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(minimumSize: buttonSize),
+            onPressed: count == 0
+                ? null
+                : () async {
+                    await controller.removeAction(selected);
+                    selected.clear();
                     selectMode.value = SelectMode.none;
                   },
-                )
-              ]);
+            icon: Icon(waldIcon(Icons.delete_outline), size: WaldSize.icon),
+            label: Text(translate('Delete')),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(minimumSize: buttonSize),
+              onPressed: SelectedItems.valid(selected.items)
+                  ? () {
+                      controller.sendFiles(
+                          selected, controller.getOtherSideDirectoryData());
+                      selected.clear();
+                      selectMode.value = SelectMode.none;
+                    }
+                  : null,
+              icon: Icon(waldIcon(showLocal ? Icons.upload : Icons.download),
+                  size: WaldSize.icon),
+              label: Text(translate(showLocal ? 'Send' : 'Receive')),
+            ),
+          ),
+        ]),
+      ],
+    );
+  }
+
+  // 데스크탑 전송 목록과 같은 상태색: 오류 빨강·일시 정지 주황·완료 초록(취소·건너뜀은 회색), 그 밖은 아이콘 검정·글자 회색.
+  Color _waldStateColor(JobProgress job, {bool text = false}) {
+    switch (job.state) {
+      case JobState.error:
+        return WaldPalette.red600;
+      case JobState.paused:
+        return WaldPalette.amber600;
+      case JobState.done:
+        if (job.err == 'cancel' || job.err == 'skipped') {
+          return WaldPalette.neutral500;
         }
-      }
+        return text ? WaldPalette.green700 : WaldPalette.green600;
+      default:
+        return text ? WaldPalette.neutral500 : WaldPalette.neutral900;
+    }
+  }
 
-      if (jobTable.isEmpty) {
-        return Offstage();
-      }
+  String _waldJobStatus(JobProgress job, bool isDelete) {
+    switch (job.state) {
+      case JobState.none:
+        return translate(isDelete ? 'Deleting' : 'Waiting');
+      case JobState.inProgress:
+        if (isDelete) return translate('Deleting');
+        final verb = translate(job.isRemoteToLocal ? 'Receiving' : 'Sending');
+        return job.speed > 0
+            ? '$verb · ${readableFileSize(job.speed)}/s'
+            : verb;
+      case JobState.paused:
+        return translate('Paused');
+      case JobState.done:
+        if (job.err == 'cancel') return translate('Cancelled');
+        if (job.err == 'skipped') return translate('Skipped');
+        return translate(isDelete
+            ? 'Deleted'
+            : job.isRemoteToLocal
+                ? 'Received'
+                : 'Sent');
+      case JobState.error:
+        final failed = translate(isDelete ? 'Delete failed' : 'Transfer failed');
+        return job.err.isEmpty ? failed : '$failed: ${translate(job.err)}';
+    }
+  }
 
-      // Find the first job that is in progress (the one actually transferring data)
-      // Rust backend processes jobs sequentially, so the first inProgress job is the active one
-      final activeJob = jobTable
-              .firstWhereOrNull((job) => job.state == JobState.inProgress) ??
-          jobTable.last;
+  // 받기가 끝난 이 폰의 파일(실행 파일 아님)은 [파일 열기](DSK-08 모바일판 — Android 만).
+  bool _waldCanOpenReceived(JobProgress job) =>
+      isAndroid &&
+      job.type == JobType.transfer &&
+      job.isRemoteToLocal &&
+      job.state == JobState.done &&
+      job.err.isEmpty &&
+      job.to.isNotEmpty &&
+      FileSystemEntity.typeSync(job.to) == FileSystemEntityType.file &&
+      !waldIsExecutable(job.to);
 
-      switch (activeJob.state) {
-        case JobState.inProgress:
-          return BottomSheetBody(
-            leading: CircularProgressIndicator(),
-            title: translate("Waiting"),
-            text:
-                "${translate("Speed")}:  ${readableFileSize(activeJob.speed)}/s",
-            onCanceled: () {
-              model.jobController.cancelJob(activeJob.id);
-              jobTable.clear();
-            },
-          );
-        case JobState.done:
-          return BottomSheetBody(
-            leading: Icon(waldIcon(Icons.check)),
-            title: "${translate("Successful")}!",
-            text: activeJob.display(),
-            onCanceled: () => jobTable.clear(),
-          );
-        case JobState.error:
-          return BottomSheetBody(
-            leading: Icon(waldIcon(Icons.error)),
-            title: "${translate("Error")}!",
-            text: "",
-            onCanceled: () => jobTable.clear(),
-          );
-        case JobState.none:
-          break;
-        case JobState.paused:
-          // TODO: Handle this case.
-          break;
-      }
-      return Offstage();
-    });
+  Widget? _waldJobBar() {
+    final jobTable = model.jobController.jobTable;
+    if (jobTable.isEmpty) return null;
+    // Rust 가 작업을 차례로 처리하므로 진행 중인 첫 작업이 실제로 보내는 작업이다.
+    final job =
+        jobTable.firstWhereOrNull((j) => j.state == JobState.inProgress) ??
+            jobTable.last;
+    final isDelete =
+        job.type == JobType.deleteFile || job.type == JobType.deleteDir;
+    final waiting = jobTable
+        .where((j) =>
+            !identical(j, job) &&
+            (j.state == JobState.none ||
+                j.state == JobState.inProgress ||
+                j.state == JobState.paused))
+        .length;
+    var status = _waldJobStatus(job, isDelete);
+    if (waiting > 0) status += ' · ${translate('{$waiting} more')}';
+    final parts = job.jobName.split(RegExp(r'[\\/]'))
+      ..removeWhere((e) => e.isEmpty);
+    final name = parts.isEmpty ? job.jobName : parts.last;
+    final running = job.state == JobState.none ||
+        job.state == JobState.inProgress ||
+        job.state == JobState.paused;
+
+    Widget button(String label, VoidCallback onPressed, {bool primary = false}) {
+      final style = ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
+        padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 12)),
+      );
+      final text = Text(translate(label));
+      return (primary
+              ? ElevatedButton(style: style, onPressed: onPressed, child: text)
+              : OutlinedButton(style: style, onPressed: onPressed, child: text))
+          .marginOnly(left: 6);
+    }
+
+    return Row(children: [
+      Icon(
+          waldIcon(isDelete
+              ? Icons.delete_outline
+              : job.isRemoteToLocal
+                  ? Icons.download
+                  : Icons.upload),
+          size: 22,
+          color: _waldStateColor(job)),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExtendedText(
+              name,
+              maxLines: 1,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: WaldPalette.neutral900),
+              overflowWidget: const TextOverflowWidget(
+                  child: Text('…'), position: TextOverflowPosition.start),
+            ),
+            Text(status,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: WaldSize.smallFont,
+                  color: _waldStateColor(job, text: true),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                )).marginOnly(top: 2),
+            if (job.type == JobType.transfer &&
+                job.state == JobState.inProgress)
+              LinearPercentIndicator(
+                animateFromLastPercent: true,
+                padding: EdgeInsets.zero,
+                lineHeight: 4,
+                barRadius: const Radius.circular(2),
+                percent: job.percent.clamp(0.0, 1.0),
+                progressColor: MyTheme.accent,
+                backgroundColor: WaldPalette.neutral100,
+                trailing: SizedBox(
+                  width: 40,
+                  child: Text(job.percentText,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: WaldSize.smallFont,
+                        color: WaldPalette.neutral600,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      )),
+                ),
+              ).marginOnly(top: 6),
+          ],
+        ),
+      ),
+      if (job.state == JobState.paused)
+        button('Resume', () => model.jobController.resumeJob(job.id),
+            primary: true),
+      if (running)
+        button('Cancel', () {
+          model.jobController.cancelJob(job.id);
+          jobTable.clear();
+        }),
+      if (!running && _waldCanOpenReceived(job))
+        button('Open file', () => waldOpenLocalFile(job.to), primary: true),
+      if (!running) button('Close', () => jobTable.clear()),
+    ]);
   }
 
   SelectedItems? getActiveSelectedItems() {
@@ -453,139 +650,145 @@ class _FileManagerViewState extends State<FileManagerView> {
       headTools(),
       Expanded(child: Obx(() {
         final entries = controller.directory.value.entries;
-        return ListView.builder(
-          controller: _listScrollController,
-          itemCount: entries.length + 1,
-          itemBuilder: (context, index) {
-            if (index >= entries.length) {
-              return listTail();
-            }
-            var selected = false;
-            if (widget.selectMode.value != SelectMode.none) {
-              selected = _selectedItems.items.contains(entries[index]);
-            }
+        // Waldlust(DSK-12 — 부록 A-58): 데스크탑 파일 전송 창처럼 흰 카드 하나 안의 표 행(행마다 카드를 띄우지 않는다).
+        return Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          clipBehavior: Clip.antiAlias,
+          decoration: waldCardDecoration(),
+          child: ListView.separated(
+            controller: _listScrollController,
+            itemCount: entries.length + 1,
+            separatorBuilder: (context, index) => const Divider(
+                height: 1, thickness: 1, color: WaldPalette.neutral100),
+            itemBuilder: (context, index) {
+              if (index >= entries.length) {
+                return listTail();
+              }
+              final entry = entries[index];
+              var selected = false;
+              if (widget.selectMode.value != SelectMode.none) {
+                selected = _selectedItems.items.contains(entry);
+              }
 
-            final sizeStr = entries[index].isFile
-                ? readableFileSize(entries[index].size.toDouble())
-                : "";
+              final sizeStr =
+                  entry.isFile ? readableFileSize(entry.size.toDouble()) : "";
 
-            final showCheckBox = () {
-              return widget.selectMode.value != SelectMode.none &&
-                  widget.selectMode.value.eq(controller.selectedItems.isLocal);
-            }();
-            return Card(
-              child: ListTile(
-                leading: entries[index].isDrive
-                    ? Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Image(
-                            image: iconHardDrive,
-                            fit: BoxFit.scaleDown,
-                            color: Theme.of(context)
-                                .iconTheme
-                                .color
-                                ?.withOpacity(0.7)))
-                    // Waldlust(DSK-12): 데스크탑 파일 전송 창과 같은 종류별 아이콘(부록 A-36).
-                    : Icon(
-                        waldFileEntryIcon(entries[index].name,
-                            isDir: !entries[index].isFile),
-                        size: 32),
-                title: Text(entries[index].name),
+              final showCheckBox = () {
+                return widget.selectMode.value != SelectMode.none &&
+                    widget.selectMode.value.eq(controller.selectedItems.isLocal);
+              }();
+              return ListTile(
                 selected: selected,
-                subtitle: entries[index].isDrive
+                selectedTileColor: WaldPalette.neutral200,
+                selectedColor: WaldPalette.neutral900,
+                leading: Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (showCheckBox && !entry.isDrive)
+                    Checkbox(
+                        visualDensity: VisualDensity.compact,
+                        value: selected,
+                        onChanged: (v) {
+                          if (v == null) return;
+                          if (v && !selected) {
+                            _selectedItems.add(entry);
+                          } else if (!v && selected) {
+                            _selectedItems.remove(entry);
+                          }
+                          setState(() {});
+                        }),
+                  // 종류 아이콘 — 폴더만 주황, 드라이브 n600, 파일 n500(데스크탑과 같다).
+                  waldIconBox(
+                      waldFileEntryIcon(entry.name,
+                          isDir: !entry.isFile, isDrive: entry.isDrive),
+                      color: entry.isDrive
+                          ? WaldPalette.neutral600
+                          : entry.isFile
+                              ? WaldPalette.neutral500
+                              : WaldPalette.amber500),
+                ]),
+                title: Text(entry.name, style: const TextStyle(fontSize: 14)),
+                subtitle: entry.isDrive
                     ? null
                     : Text(
-                        "${entries[index].lastModified().toString().replaceAll(".000", "")}   $sizeStr",
-                        style: TextStyle(fontSize: 12, color: MyTheme.darkGray),
+                        [
+                          entry.lastModified().toString().replaceAll(".000", ""),
+                          if (sizeStr.isNotEmpty) sizeStr
+                        ].join(' · '),
+                        style: const TextStyle(
+                            fontSize: WaldSize.smallFont,
+                            color: WaldPalette.neutral500,
+                            fontFeatures: [FontFeature.tabularFigures()]),
                       ),
-                trailing: entries[index].isDrive
+                trailing: entry.isDrive || showCheckBox
                     ? null
-                    : showCheckBox
-                        ? Checkbox(
-                            value: selected,
-                            onChanged: (v) {
-                              if (v == null) return;
-                              if (v && !selected) {
-                                _selectedItems.add(entries[index]);
-                              } else if (!v && selected) {
-                                _selectedItems.remove(entries[index]);
-                              }
-                              setState(() {});
-                            })
-                        : PopupMenuButton<String>(
-                            tooltip: "",
-                            icon: Icon(waldIcon(Icons.more_vert)),
-                            itemBuilder: (context) {
-                              return [
-                                PopupMenuItem(
-                                  child: Text(translate("Delete")),
-                                  value: "delete",
-                                ),
-                                PopupMenuItem(
-                                  child: Text(translate("Multi Select")),
-                                  value: "multi_select",
-                                ),
-                                PopupMenuItem(
-                                  child: Text(translate("Properties")),
-                                  value: "properties",
-                                  enabled: false,
-                                ),
-                                if (!entries[index].isDrive &&
-                                    versionCmp(gFFI.ffiModel.pi.version,
-                                            "1.3.0") >=
-                                        0)
-                                  PopupMenuItem(
-                                    child: Text(translate("Rename")),
-                                    value: "rename",
-                                  )
-                              ];
-                            },
-                            onSelected: (v) {
-                              if (v == "delete") {
-                                final items = SelectedItems(isLocal: isLocal);
-                                items.add(entries[index]);
-                                controller.removeAction(items);
-                              } else if (v == "multi_select") {
-                                _selectedItems.clear();
-                                widget.selectMode.toggle(isLocal);
-                                setState(() {});
-                              } else if (v == "rename") {
-                                controller.renameAction(
-                                    entries[index], isLocal);
-                              }
-                            }),
+                    : PopupMenuButton<String>(
+                        tooltip: "",
+                        icon: Icon(waldIcon(Icons.more_vert)),
+                        itemBuilder: (context) {
+                          return [
+                            if (versionCmp(gFFI.ffiModel.pi.version, "1.3.0") >=
+                                0)
+                              PopupMenuItem(
+                                child: Text(translate("Rename")),
+                                value: "rename",
+                              ),
+                            PopupMenuItem(
+                              child: Text(translate("Delete")),
+                              value: "delete",
+                            ),
+                            PopupMenuItem(
+                              child: Text(translate("Select")),
+                              value: "multi_select",
+                            ),
+                          ];
+                        },
+                        onSelected: (v) {
+                          if (v == "delete") {
+                            final items = SelectedItems(isLocal: isLocal);
+                            items.add(entry);
+                            controller.removeAction(items);
+                          } else if (v == "multi_select") {
+                            _selectedItems.clear();
+                            widget.selectMode.toggle(isLocal);
+                            if (widget.selectMode.value != SelectMode.none) {
+                              _selectedItems.add(entry);
+                            }
+                            setState(() {});
+                          } else if (v == "rename") {
+                            controller.renameAction(entry, isLocal);
+                          }
+                        }),
                 onTap: () {
                   if (showCheckBox) {
                     if (selected) {
-                      _selectedItems.remove(entries[index]);
+                      _selectedItems.remove(entry);
                     } else {
-                      _selectedItems.add(entries[index]);
+                      _selectedItems.add(entry);
                     }
                     setState(() {});
                     return;
                   }
-                  if (entries[index].isDirectory || entries[index].isDrive) {
-                    controller.openDirectory(entries[index].path);
+                  if (entry.isDirectory || entry.isDrive) {
+                    controller.openDirectory(entry.path);
                   } else if (isLocal && isAndroid) {
                     // Waldlust(DSK-12 — DSK-08 모바일판): 이 폰의 파일을 누르면 기본 앱으로 연다.
-                    waldOpenLocalFile(entries[index].path);
+                    waldOpenLocalFile(entry.path);
                   } else {
                     // Perform file-related tasks.
                   }
                 },
-                onLongPress: entries[index].isDrive
+                onLongPress: entry.isDrive
                     ? null
                     : () {
                         _selectedItems.clear();
                         widget.selectMode.toggle(isLocal);
                         if (widget.selectMode.value != SelectMode.none) {
-                          _selectedItems.add(entries[index]);
+                          _selectedItems.add(entry);
                         }
                         setState(() {});
                       },
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       }))
     ]);
@@ -625,7 +828,8 @@ class _FileManagerViewState extends State<FileManagerView> {
                 }
                 controller.openDirectory(path);
               }),
-              divider: Icon(waldIcon(Icons.chevron_right)),
+              divider: Icon(waldIcon(Icons.chevron_right),
+                  size: 14, color: WaldPalette.neutral400),
               overflow: ScrollableOverflow(controller: _breadCrumbScroller),
             );
           })),
@@ -666,25 +870,14 @@ class _FileManagerViewState extends State<FileManagerView> {
         ],
       ));
 
-  Widget listTail() => Obx(() => Container(
-        height: 100,
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
-              child: Text(
-                controller.directory.value.path,
-                style: TextStyle(color: MyTheme.darkGray),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(2),
-              child: Text(
-                "${translate("Total")}: ${controller.directory.value.entries.length} ${translate("items")}",
-                style: TextStyle(color: MyTheme.darkGray),
-              ),
-            )
-          ],
+  // Waldlust(DSK-12 — 부록 A-58): 끝 줄은 '전체 N 항목'만(경로는 위 경로 줄에 있고, 하단 막대가 목록을 가리지 않는다).
+  Widget listTail() => Obx(() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Text(
+          "${translate("Total")} ${controller.directory.value.entries.length} ${translate("items")}",
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+              fontSize: WaldSize.smallFont, color: WaldPalette.neutral500),
         ),
       ));
 
@@ -694,13 +887,20 @@ class _FileManagerViewState extends State<FileManagerView> {
     final breadCrumbList = [
       BreadCrumbItem(
           content: IconButton(
-        icon: Icon(waldIcon(Icons.home_filled)),
+        icon: Icon(waldIcon(Icons.home_filled),
+            size: WaldSize.iconLg, color: WaldPalette.neutral600),
         onPressed: onHome,
       ))
     ];
+    // Waldlust(DSK-12 — 부록 A-58): 앞 조각은 회색, 지금 폴더는 굵은 검정.
     breadCrumbList.addAll(list.asMap().entries.map((e) => BreadCrumbItem(
         content: TextButton(
-            child: Text(e.value),
+            child: Text(e.value,
+                style: e.key == list.length - 1
+                    ? const TextStyle(
+                        color: WaldPalette.neutral900,
+                        fontWeight: FontWeight.w600)
+                    : const TextStyle(color: WaldPalette.neutral500)),
             style:
                 ButtonStyle(minimumSize: MaterialStateProperty.all(Size(0, 0))),
             onPressed: () => onPressed(list.sublist(0, e.key + 1))))));

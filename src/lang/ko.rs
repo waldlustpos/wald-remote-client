@@ -826,5 +826,20 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Open source notices", "오픈소스 고지"),
         // Waldlust(DSK-12): 폰 연결 화면 맨 위 내 ID(보기만).
         ("My ID", "내 ID"),
+        // Waldlust(DSK-12 — 부록 A-58): 폰 파일 전송 화면의 탭·선택 막대·작업 상태.
+        ("My phone", "내 폰"),
+        ("Remote device", "원격 기기"),
+        ("{} selected", "{}개 선택"),
+        ("Destination", "받는 위치"),
+        ("Sending", "보내는 중"),
+        ("Receiving", "받는 중"),
+        ("Sent", "보내기 완료"),
+        ("Received", "받기 완료"),
+        ("Deleted", "삭제 완료"),
+        ("Transfer failed", "전송 실패"),
+        ("Delete failed", "삭제 실패"),
+        ("Cancelled", "취소됨"),
+        ("Paused", "일시 정지"),
+        ("{} more", "외 {}건"),
     ].iter().cloned().collect();
 }
