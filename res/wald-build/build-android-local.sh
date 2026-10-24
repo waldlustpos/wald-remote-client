@@ -3,13 +3,17 @@
 # 2026-09-29 에 재현한 절차를 한 파일로 모은 것이다(명세 docs/HANDOVER_SPEC.md F-46).
 # CI 원본: .github/workflows/wald-android.yml, .github/workflows/bridge.yml
 #
-# 사용:  zsh ~/wald-build/build-android-local.sh [커밋·브랜치] [bidirectional|incoming] [dummy|mock|prodtest|release]   (기본 waldlust, bidirectional, dummy)
-# 결과:  ~/wald-build/waldlust-<버전>-android-localtest[-incoming].apk(prodtest 는 -android-prodtest), 로그는 ~/wald-build/logs/
-#        + ~/wald-build/dist/<버전>-<sha9>-<대상>/waldlust-remote[-incoming]-<버전>-android[-<대상>].apk 와 manifest-android-<변형>.txt
+# 사용:  zsh ~/wald-build/build-android-local.sh [커밋·브랜치] [bidirectional|incoming|outgoing] [dummy|mock|prodtest|release]   (기본 waldlust, bidirectional, dummy)
+# 결과:  ~/wald-build/waldlust-<버전>-android-localtest[-incoming|-mobile].apk(prodtest 는 -android-prodtest), 로그는 ~/wald-build/logs/
+#        + ~/wald-build/dist/<버전>-<sha9>-<대상>/waldlust-remote[-incoming|-mobile]-<버전>-android[-<대상>].apk 와 manifest-android-<변형>.txt
 #        (설치 파일 이름 규칙 — 결정 D36: release 는 '-<대상>' 을 붙이지 않는다. 예 waldlust-remote-incoming-1.5.0-android.apk)
 #        수신 전용이면 도우미 앱(wald-helper — 부록 A-44, 결정 D39·D40)도 같은 버전·같은 서명으로 먼저 만들어 메인 APK 의
 #        assets/wald-helper.apk 로 넣고(앱이 설치한다 — D40), 따로도 남긴다:
 #        dist 의 waldlust-remote-helper-<버전>-android[-<대상>].apk 와 manifest-android-helper.txt. wald-helper 가 없는 옛 ref 는 건너뛴다.
+#        outgoing = 모바일(발신 전용 — 직원 개인 폰, DSK-12·결정 D43): WALDLUST_VARIANT=outgoing 을 Rust(conn-type outgoing 프리셋)와
+#        Gradle(targetSdk 34·BuildConfig.WALD_OUTGOING·src/waldOutgoing 매니페스트 — 피제어 권한·구성요소 없음)이 함께 읽는다.
+#        heartbeat 는 그대로 보낸다(폰 ID 확인용). 설치 파일 이름은 '-mobile'(D43 (5)), manifest 는 manifest-android-outgoing.txt.
+#        verify 가 targetSdk 34 와 피제어 권한·구성요소가 빠졌는지 본다(build-android-local.ps1 과 같은 목록).
 #
 # 원칙
 # - 비관리 빌드: WALDLUST_PRESET_PASSWORD 를 넣지 않는다(무인 기본값·기기별 비밀번호 없음).
@@ -59,7 +63,8 @@ VARIANT="${2:-bidirectional}"
 case "$VARIANT" in
   bidirectional) SUFFIX="" ;;
   incoming) SUFFIX="-incoming" ;;
-  *) echo "FAIL: 변형은 bidirectional 또는 incoming"; exit 1 ;;
+  outgoing) SUFFIX="-mobile" ;;   # 모바일(D43 (5) — 설치 파일 이름), 변형 이름은 outgoing 그대로
+  *) echo "FAIL: 변형은 bidirectional·incoming·outgoing"; exit 1 ;;
 esac
 TARGET="${3:-dummy}"
 case "$TARGET" in dummy|mock|prodtest|release) ;; *) echo "FAIL: 대상은 dummy·mock·prodtest·release"; exit 1 ;; esac
@@ -87,6 +92,7 @@ if [ -n "$PROD" ]; then
 fi
 unset WALDLUST_PRESET_PASSWORD WALDLUST_VARIANT WALDLUST_INCOMING_PW_STORAGE WALDLUST_INCOMING_PW_SALT
 [ "${WALD_TEST_MANAGED:-}" = 1 ] && export WALDLUST_PRESET_PASSWORD=local-test-marker
+[ "$VARIANT" = outgoing ] && export WALDLUST_VARIANT=outgoing   # build.rs·wald_variant.rs·app/build.gradle 이 읽는다
 # macOS: bindgen(kcp-sys, scrap 등)이 Android 헤더를 찾도록 NDK sysroot 를 준다. Linux CI 는 호스트 /usr/include 로 넘어간다.
 export LIBCLANG_PATH=/Library/Developer/CommandLineTools/usr/lib
 NDKSYS="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/sysroot"
@@ -136,6 +142,7 @@ if [ "$TARGET" = release ]; then
   CARGO_VER=$(grep -m1 -E '^version *=' Cargo.toml | cut -d'"' -f2)
   [ "$TAG_VER" = "$SRC_VER" ] && [ "$TAG_VER" = "$CARGO_VER" ] || die "태그 버전($TAG_VER)과 소스 버전(pubspec $SRC_VER, Cargo.toml $CARGO_VER)이 다르다"
 fi
+[ "$VARIANT" != outgoing ] || [ -f res/wald-variant/outgoing.json ] || die "$BASE 에 발신 전용 변형(res/wald-variant/outgoing.json)이 없다"
 
 # 수신 전용: 테스트 비밀번호를 해시로 바꿔 넣는다(평문은 하위 셸에만 있고 빌드 환경에는 들어가지 않는다).
 if [ "$VARIANT" = incoming ]; then
@@ -260,6 +267,22 @@ for abi in arm64-v8a armeabi-v7a; do
 done
 rm -f "$LOG/check.so"
 [ -z "$BAD" ] || die "heartbeat·API 주소 확인 실패 — 이 APK 는 설치하지 않는다"
+# 모바일(발신 전용, DSK-12): targetSdk 34, 피제어 권한·구성요소 없음(build-android-local.ps1 과 같은 목록).
+if [ "$VARIANT" = outgoing ]; then
+  echo "$BADGING" | grep -q "^targetSdkVersion:'34'" || die "발신 전용 APK 의 targetSdk 가 34 가 아니다"
+  PERMS=$("$BT/aapt2" dump permissions "$APK")
+  LEFT=""
+  for p in QUERY_ALL_PACKAGES SYSTEM_ALERT_WINDOW REQUEST_IGNORE_BATTERY_OPTIMIZATIONS RECEIVE_BOOT_COMPLETED WRITE_SECURE_SETTINGS \
+           REQUEST_INSTALL_PACKAGES FOREGROUND_SERVICE INPUT_BRIDGE CAMERA; do
+    echo "$PERMS" | grep -qE "\.$p\b" && LEFT="$LEFT $p"
+  done
+  XML=$("$BT/aapt2" dump xmltree --file AndroidManifest.xml "$APK")
+  for c in android.accessibilityservice BootReceiver MainService FloatingWindowService WaldWakeActivity; do
+    echo "$XML" | grep -qF "$c" && LEFT="$LEFT $c"
+  done
+  [ -z "$LEFT" ] || die "발신 전용 APK 에 아직 있다:$LEFT"
+  echo "outgoing-only: targetSdk 34, controlled-side permissions and components removed"
+fi
 PKG_LINE=$(echo "$BADGING" | grep -E '^package:')
 if [ "$TARGET" = release ]; then
   [ "$SIGNER" = "$(tr -d ' \n' < "$KEYS/android-release.sha256")" ] || die "서명 지문이 릴리즈 키와 다르다 — 이 APK 는 배포하지 않는다"
@@ -309,6 +332,7 @@ cp "$APK" "$DAPK" || die "dist 복사"
   echo "heartbeat: $WALDLUST_HEARTBEAT_URL"
   echo "check: $CHECK"
   [ "$VARIANT" = incoming ] && echo "incoming password fingerprint: $FP"
+  [ "$VARIANT" = outgoing ] && echo "outgoing: targetSdk 34, controlled-side permissions removed"
   echo "package: $(echo "$BADGING" | grep -E '^package:' | sed -E "s/.*name='([^']*)'.*versionCode='([^']*)'.*versionName='([^']*)'.*/\1 versionCode=\2 versionName=\3/")"
   echo "signer sha256: $SIGNER"
   [ "$TARGET" = release ] && echo "signing: release key ($KEYS/android-release.properties)"
