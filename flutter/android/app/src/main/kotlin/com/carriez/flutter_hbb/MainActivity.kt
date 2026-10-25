@@ -69,6 +69,8 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         // Waldlust(DSK-02 — 결정 D40): '출처를 알 수 없는 앱 설치'를 허용하고 돌아오면 도우미 설치를 이어 간다.
         WaldHelper.resumePendingInstall(this)
+        // Waldlust(DSK-01 — 결정 D44): 앱 안 업데이트도 같다.
+        WaldSelfUpdate.resumePendingInstall(this)
         val inputPer = WaldInputBridge.isInputOpen()
         activity.runOnUiThread {
             flutterMethodChannel?.invokeMethod(
@@ -195,6 +197,10 @@ class MainActivity : FlutterActivity() {
                 }
                 "wald_helper_install" -> {
                     result.success(WaldHelper.install(this@MainActivity))
+                }
+                // Waldlust(DSK-01 — 결정 D44): 수신 전용 앱 안 업데이트 — Rust 가 받아 확인한 APK 를 설치(WaldSelfUpdate.kt).
+                "wald_self_update_install" -> {
+                    result.success(WaldSelfUpdate.install(this@MainActivity, call.arguments as? String ?: ""))
                 }
                 // Waldlust(DSK-12): 받은 파일을 기본 앱으로 열기(WaldFiles.kt).
                 "wald_open_file" -> {

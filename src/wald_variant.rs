@@ -22,6 +22,8 @@ const INCOMING_PW_SALT: Option<&str> = option_env!("WALDLUST_INCOMING_PW_SALT");
 const INCOMING_PRESET: &str = include_str!("../res/wald-variant/incoming.json");
 const COMMON_PRESET: &str = include_str!("../res/wald-variant/common.json");
 const OUTGOING_PRESET: &str = include_str!("../res/wald-variant/outgoing.json");
+// 현장 앱 안 업데이트(D44)의 받기 키 라벨. preset_hash.py --field-key-sha256 과 같아야 한다.
+const FIELD_KEY_LABEL: &str = "waldlust-field-update-v1:";
 
 #[inline]
 pub fn is_incoming() -> bool {
@@ -102,6 +104,27 @@ fn apply_outgoing() {
     });
 }
 
+/// 현장 앱 안 업데이트(DSK-01, 결정 D44)의 받기 키. 수신 전용은 로그인하지 않으므로 빌드에 든 공통 비밀번호
+/// 해시에서 계산한다 — 새 비밀을 더하지 않는다(키를 꺼낼 수 있는 사람은 이미 설치본, 곧 해시를 가졌다).
+/// 어드민은 이 값의 SHA-256 만 둔다(preset_hash.py --field-key-sha256). 로그·상태·IPC·heartbeat 에 넣지 않는다.
+pub(crate) fn field_update_key() -> Option<String> {
+    if !is_incoming() {
+        return None;
+    }
+    field_key_of(INCOMING_PW_STORAGE.unwrap_or_default())
+}
+
+fn field_key_of(pw_storage: &str) -> Option<String> {
+    use hbb_common::sha2::{Digest, Sha256};
+    if pw_storage.is_empty() {
+        return None;
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(FIELD_KEY_LABEL.as_bytes());
+    hasher.update(pw_storage.as_bytes());
+    Some(hex::encode(hasher.finalize()))
+}
+
 fn incoming_preset(
     pw_storage: &str,
     pw_salt: &str,
@@ -136,6 +159,16 @@ mod tests {
             TEST_STORAGE,
             TEST_SALT
         ));
+    }
+
+    // 받기 키(D44): 기대값은 preset_hash.py 와 같은 계산(라벨 + 저장 해시의 SHA-256 hex)이다.
+    #[test]
+    fn test_field_key_vector() {
+        assert_eq!(
+            field_key_of(TEST_STORAGE).as_deref(),
+            Some("751870313a9d1a70c160f8bc4112a15010ea29fb92d504fb513eba3886f73219")
+        );
+        assert_eq!(field_key_of(""), None);
     }
 
     // 프리셋 키가 의도한 맵(HARD·BUILTIN·OVERWRITE·OVERWRITE_LOCAL)에 들어가는지 본다.
