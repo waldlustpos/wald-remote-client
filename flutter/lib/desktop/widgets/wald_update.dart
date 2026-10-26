@@ -16,7 +16,8 @@ import 'package:url_launcher/url_launcher_string.dart';
 // 홈 '새 버전' 카드의 [업데이트] 대화상자와 설정 > 정보의 '최신 버전' 줄을 그린다.
 // 받기는 앱 로그인 토큰으로 한다 — 로그인하지 않았으면 로그인을 권하거나 어드민 '원격 설치 파일'을 연다.
 // 현장 수신 전용(결정 D44 — 부록 A-62): Windows(서비스가 UAC 없이 설치 — 상태 mode 'service')·Android(시스템 설치 창 — 'android')도
-// 같은 대화상자를 쓴다. 로그인하지 않는다(받기 키). Windows 수신 전용 창은 폭 280 이라 대화상자 바깥 여백을 줄인다.
+// 같은 진행·오류 창을 쓴다. 로그인하지 않는다(받기 키). 홈 카드는 없고(2026-10-26 사용자) ⓘ 정보 대화상자가 열 때 확인해
+// 최신 버전을 보이고 [업데이트]로 확인 창 없이 바로 받는다. Windows 수신 전용 창은 폭 280 이라 대화상자 바깥 여백을 줄인다.
 
 bool get waldUpdateSupported =>
     ((isWindows || isMacOS) && !bind.isOutgoingOnly()) ||
@@ -27,17 +28,8 @@ EdgeInsets? get _insetPadding => isDesktop && bind.isIncomingOnly()
     ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
     : null;
 
-/// 확인 창의 설치 안내: 현장 Windows(권한 확인 없음)·Android(시스템 설치 창)·직원용 Windows(UAC)·macOS(관리자 암호).
-String _installTip(String mode) {
-  switch (mode) {
-    case 'service':
-      return 'wald-update-field-tip';
-    case 'android':
-      return 'wald-update-android-tip';
-    default:
-      return isWindows ? 'wald-update-uac-tip' : 'wald-update-mac-tip';
-  }
-}
+/// 확인 창의 설치 안내: 직원용 Windows(UAC)·macOS(관리자 암호). 현장 수신 전용은 확인 창 없이 바로 받는다.
+String _installTip() => isWindows ? 'wald-update-uac-tip' : 'wald-update-mac-tip';
 
 /// 설치하는 동안의 안내(진행 창).
 String _installingTip(String mode) {
@@ -78,7 +70,7 @@ void waldUpdateCheckNow() {
   bind.mainSetCommon(key: 'wald-update-check', value: '');
 }
 
-/// 홈 카드·정보 탭의 [업데이트].
+/// 홈 카드·정보 탭의 [업데이트](수신 전용은 ⓘ 정보 대화상자의 [업데이트]).
 Future<void> showWaldUpdateDialog() async {
   final s = _readState();
   final latest = _latest(s);
@@ -86,22 +78,27 @@ Future<void> showWaldUpdateDialog() async {
   // 확인 중(checking)이어도 지난 확인의 새 버전으로 진행한다.
   if (version.isEmpty || versionCmp(version, _str(s, 'current')) <= 0) return;
   final page = _str(latest, 'page');
-  // 해시가 없는 등 앱 안에서 받을 수 없으면 지금처럼 어드민 페이지를 연다.
+  final incoming = bind.isIncomingOnly();
+  // 해시가 없는 등 앱 안에서 받을 수 없으면 지금처럼 어드민 페이지를 연다(현장 기기는 어드민을 열지 않고 알리기만).
   if (_str(latest, 'download').isEmpty) {
-    if (page.isNotEmpty) launchUrlString(page);
+    if (incoming) {
+      _showError('unavailable', '', page);
+    } else if (page.isNotEmpty) {
+      launchUrlString(page);
+    }
     return;
   }
-  final incoming = bind.isIncomingOnly();
-  if (!incoming && bind.mainGetLocalOption(key: 'access_token').isEmpty) {
+  // 현장 수신 전용(결정 D44 — 2026-10-26 사용자): ⓘ 정보에서 최신 버전을 보고 누른 [업데이트]가 곧 확인이다 — 바로 받는다.
+  if (incoming) {
+    gFFI.dialogManager.dismissAll();
+    _startUpdate(page);
+    return;
+  }
+  if (bind.mainGetLocalOption(key: 'access_token').isEmpty) {
     _showLoginNeeded(page);
     return;
   }
-  // 수신 전용은 원격 창을 열지 않는다 — 대신 이 기기로 들어온 원격 연결 수(상태 conns)를 알린다.
-  final subWindows = incoming
-      ? 0
-      : (await rustDeskWinManager.getAllSubWindowIds()).length;
-  final conns = s['conns'] is int ? s['conns'] as int : 0;
-  final mode = _str(s, 'mode');
+  final subWindows = (await rustDeskWinManager.getAllSubWindowIds()).length;
   final changelog = _str(latest, 'changelog');
   gFFI.dialogManager.dismissAll();
   gFFI.dialogManager.show((setState, close, context) {
@@ -123,10 +120,7 @@ Future<void> showWaldUpdateDialog() async {
           if (subWindows > 0)
             Text(translate('wald-update-windows-{$subWindows}-tip'))
                 .marginOnly(top: 4),
-          if (conns > 0)
-            Text(translate('wald-update-conns-{$conns}-tip'))
-                .marginOnly(top: 4),
-          Text(translate(_installTip(mode))).marginOnly(top: 4),
+          Text(translate(_installTip())).marginOnly(top: 4),
           if (changelog.isNotEmpty)
             InkWell(
               onTap: () => launchUrlString(changelog),
@@ -364,9 +358,22 @@ void _showError(String code, String detail, String page) {
   });
 }
 
+/// 수신 전용 ⓘ 정보 대화상자의 버튼: 새 버전이 있으면 [닫기][업데이트], 없으면 [닫기].
+List<Widget> waldUpdateInfoActions(VoidCallback close) {
+  bool available() =>
+      _str(stateGlobal.waldUpdateState.value, 'status') == 'available';
+  return [
+    Obx(() => dialogButton('Close', onPressed: close, isOutline: available())),
+    Obx(() => available()
+        ? dialogButton('Update', onPressed: showWaldUpdateDialog)
+        : const SizedBox.shrink()),
+  ];
+}
+
 /// 설정 > 정보의 '최신 버전' 줄 — 처음 그릴 때 확인한다(1분 안에 확인했으면 그 결과를 쓴다).
 class WaldUpdateAboutRow extends StatefulWidget {
-  /// 수신 전용 ⓘ 정보 대화상자(결정 D44 — 좁은 창): 줄을 나눠 쌓고 버튼은 아래 줄에 둔다.
+  /// 수신 전용 ⓘ 정보 대화상자(결정 D44 — 좁은 창): 열 때마다 확인하고 버전·빌드 날짜 줄과 같은 모양으로
+  /// 최신 버전만 보인다. [업데이트]는 대화상자 버튼(waldUpdateInfoActions)이다.
   final bool compact;
   const WaldUpdateAboutRow({super.key, this.compact = false});
 
@@ -382,7 +389,8 @@ class _WaldUpdateAboutRowState extends State<WaldUpdateAboutRow> {
     if (s.isNotEmpty) stateGlobal.waldUpdateState.value = s;
     final checkedAt = s['checkedAt'] is int ? s['checkedAt'] as int : 0;
     if (s['status'] != 'checking' &&
-        DateTime.now().millisecondsSinceEpoch - checkedAt > 60 * 1000) {
+        (widget.compact ||
+            DateTime.now().millisecondsSinceEpoch - checkedAt > 60 * 1000)) {
       waldUpdateCheckNow();
     }
   }
@@ -414,28 +422,21 @@ class _WaldUpdateAboutRowState extends State<WaldUpdateAboutRow> {
       }
       const linkStyle = TextStyle(decoration: TextDecoration.underline);
       if (widget.compact) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${translate('wald-update-latest-label')}: $text',
-                style: status == 'available'
-                    ? const TextStyle(fontWeight: FontWeight.w600)
-                    : null),
-            if (checkedAt > 0)
-              Text(
-                '${translate('wald-update-checked-at')}: ${DateTime.fromMillisecondsSinceEpoch(checkedAt).toString().substring(5, 16)}',
-                style: const TextStyle(
-                    fontSize: 12, color: WaldPalette.neutral500),
-              ).marginOnly(top: 2),
-            Wrap(spacing: 8, runSpacing: 4, children: [
-              dialogButton('wald-update-check',
-                  onPressed: status == 'checking' ? null : waldUpdateCheckNow,
-                  isOutline: true),
-              if (status == 'available')
-                dialogButton('Update', onPressed: showWaldUpdateDialog),
-            ]).marginOnly(top: 6),
-          ],
-        ).marginSymmetric(vertical: 4.0);
+        final version = _str(latest, 'version');
+        final value = status == 'checking' || status == 'error'
+            ? text
+            : (version.isEmpty ? '-' : version);
+        return Row(children: [
+          SizedBox(
+              width: 80,
+              child: Text(translate('wald-update-latest-label'),
+                  style: const TextStyle(color: WaldPalette.neutral500))),
+          Expanded(
+              child: Text(value,
+                  style: status == 'available'
+                      ? const TextStyle(fontWeight: FontWeight.w600)
+                      : null)),
+        ]).marginSymmetric(vertical: 4);
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -14,7 +14,6 @@ import '../../consts.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import '../widgets/wald_helper_card.dart';
-import '../widgets/wald_update_card.dart';
 import 'home_page.dart';
 
 class ServerPage extends StatefulWidget implements PageShape {
@@ -217,9 +216,6 @@ class _ServerPageState extends State<ServerPage> {
                             : ServiceNotRunningNotification(),
                         const ConnectionManager(),
                         const PermissionChecker(),
-                        // Waldlust(DSK-01 — 결정 D44): 새 버전이 있으면 앱 안 업데이트.
-                        if (isAndroid && bind.isIncomingOnly())
-                          const WaldUpdateCard(),
                         // Waldlust(DSK-02 — 결정 D40): 도우미 앱·adb 1회 설정 상태와 도우미 설치.
                         if (isAndroid && bind.isIncomingOnly())
                           const WaldHelperCard(),

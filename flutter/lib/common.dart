@@ -4111,7 +4111,7 @@ void checkUpdate() {
       // Waldlust(결정 D37): 업스트림 대신 어드민에 묻는다 — 데스크탑 양방향(직원용), 그리고 현장 수신 전용 Windows·Android
       // (결정 D44 — desktop/widgets/wald_update.dart waldUpdateSupported). 같은 바인딩이
       // src/common.rs check_software_update → src/wald_update.rs start(시작 때와 12시간마다)를 연다.
-      // 확인 결과는 홈 '새 버전' 카드와 설정 > 정보가 쓴다(명세 DSK-01 — 앱 안 업데이트).
+      // 확인 결과는 홈 '새 버전' 카드와 설정 > 정보, 수신 전용은 ⓘ 정보가 쓴다(명세 DSK-01 — 앱 안 업데이트).
       platformFFI.registerEventHandler(kWaldUpdateState, kWaldUpdateState,
           (Map<String, dynamic> evt) async {
         stateGlobal.waldUpdateState.value = evt;

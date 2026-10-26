@@ -129,7 +129,7 @@ function waldAbout() {
                 {"Modifications \u00A9 2026 Waldlust Co., Ltd."}<br />
                 {"Licensed under the GNU AGPL-3.0, without any warranty."}
             </div>
-            <div .wald-dialog-actions><button .wald-btn-primary #wald-about-close>{translate('Close')}</button></div>
+            <div .wald-dialog-actions>{waldUpdateAboutActions()}</div>
         </div>
     </div>;
 }
@@ -137,6 +137,7 @@ function waldAbout() {
 function waldSetAbout(open) {
     if (wald_about_open == open) return;
     wald_about_open = open;
+    if (open) waldUpdateCheckNow();
     app.update();
 }
 // 위 화면 밖 MyIdMenu: 업스트림 상태 갱신(checkConnectStatus 등)이 myIdMenu 를 부르므로 둔다. 설정 진입점(⋮)은 없다 — DSK-02.
@@ -174,29 +175,17 @@ function waldHelpCard() {
             </div>;
         }
     }
-    var quit = <div .wald-quit-row><button .wald-btn-outline #wald-quit>{translate('Quit')}</button></div>;
-    // 결정 D44: 새 버전이 있으면 종료 줄 위에 카드(Flutter buildHelpCards 의 수신 전용 카드와 같다).
-    var latest = wald_update.latest || {};
-    if (wald_update.status == "available" && latest.version) {
-        return <div>
-            <div .wald-card>
-                <div .wald-card-title>{translate('wald-update-title')}</div>
-                <div .wald-card-text>{translate('wald-update-{' + latest.version + '}-tip')}</div>
-                <div .wald-card-btns><button .wald-card-btn #wald-update>{translate('Update')}</button></div>
-            </div>
-            {quit}
-        </div>;
-    }
-    return quit;
+    return <div .wald-quit-row><button .wald-btn-outline #wald-quit>{translate('Quit')}</button></div>;
 }
 
 // ---------------------------------------------------------------- 앱 안 업데이트(명세 DSK-01 — 결정 D44, 부록 A-62)
 // 확인·받기·설치는 Rust(src/wald_update.rs)가 한다. 설치본이면 서비스(SYSTEM)가 UAC 없이 조용히 설치하고 앱을 다시 띄운다.
 // 이 화면은 handler.wald_update_state()(캐시 — 막지 않는다)를 읽어 그리고, handler.wald_update_cmd(키)로 시작·취소·설치를 보낸다.
-// 문구·흐름은 Flutter desktop/widgets/wald_update.dart 와 같다.
+// 문구·흐름은 Flutter desktop/widgets/wald_update.dart 와 같다: 홈 카드 없이(2026-10-26 사용자) 정보(i)를 열 때 확인해
+// 최신 버전을 보이고, [업데이트]를 누르면 확인 창 없이 바로 받는다.
 var wald_update = {};
 var wald_update_raw = "";
-var wald_update_dialog = ""; // "" | confirm | progress | error
+var wald_update_dialog = ""; // "" | progress | error
 var wald_update_install_sent = false;
 
 function waldUpdateLoop() {
@@ -234,17 +223,7 @@ function waldUpdateDialog() {
     var job = wald_update.job || {};
     var body;
     var actions;
-    if (wald_update_dialog == "confirm") {
-        var conns = wald_update.conns || 0;
-        body = <div>
-            <div .wald-update-versions>{wald_update.current + "  ->  " + latest.version}</div>
-            <div .wald-update-text>{translate('wald-update-confirm-tip')}</div>
-            {conns > 0 ? <div .wald-update-text>{translate('wald-update-conns-{' + conns + '}-tip')}</div> : ""}
-            <div .wald-update-text>{translate(wald_update.mode == "service" ? 'wald-update-field-tip' : 'wald-update-uac-tip')}</div>
-        </div>;
-        actions = [<button .wald-btn-outline #wald-update-close>{translate('Cancel')}</button>,
-            <button .wald-btn-primary #wald-update-ok>{translate('Update')}</button>];
-    } else if (wald_update_dialog == "progress") {
+    if (wald_update_dialog == "progress") {
         var text;
         if (job.state == "downloading") {
             text = translate('wald-update-downloading') + (job.total > 0 ? "  " + waldUpdateMb(job.done) + " / " + waldUpdateMb(job.total) + " MB" : "");
@@ -276,21 +255,31 @@ function waldUpdateDialog() {
     </div>;
 }
 
-// 정보(i) 대화상자의 '최신 버전' 줄 + [업데이트 확인]·[업데이트].
+// 정보(i) 대화상자의 '최신 버전' 줄 — 버전·빌드 날짜 줄과 같은 모양. [업데이트]는 대화상자 버튼(waldUpdateAboutActions).
 function waldUpdateAboutRow() {
     var status = wald_update.status;
     var latest = wald_update.latest || {};
-    var text = status == "checking" ? translate('wald-update-checking')
-        : status == "available" ? translate('wald-update-new-{' + latest.version + '}')
-        : status == "latest" ? translate('wald-update-is-latest')
-        : status == "error" ? translate('wald-update-check-failed') : "-";
-    return <div .wald-update-about>
-        <div .wald-update-text>{translate('wald-update-latest-label') + ": " + text}</div>
-        <div .wald-update-btns>
-            <button .wald-btn-outline #wald-update-check>{translate('wald-update-check')}</button>
-            {status == "available" ? <button .wald-btn-primary #wald-update>{translate('Update')}</button> : ""}
-        </div>
+    var value = status == "checking" ? translate('wald-update-checking')
+        : status == "error" ? translate('wald-update-check-failed')
+        : (latest.version || "-");
+    return <div .wald-info-row>
+        <div .wald-info-label>{translate('wald-update-latest-label')}</div>
+        <div .wald-info-value style={status == "available" ? "font-weight:bold" : ""}>{value}</div>
     </div>;
+}
+
+// 정보(i) 대화상자의 버튼: 새 버전이 있으면 [닫기][업데이트], 없으면 [닫기].
+function waldUpdateAboutActions() {
+    if (wald_update.status != "available") return <button .wald-btn-primary #wald-about-close>{translate('Close')}</button>;
+    return [<button .wald-btn-outline #wald-about-close>{translate('Close')}</button>,
+        <button .wald-btn-primary #wald-update>{translate('Update')}</button>];
+}
+
+// 정보(i)를 열 때마다 확인한다(Flutter WaldUpdateAboutRow compact 와 같다). 결과는 2초 폴링으로 들어온다.
+function waldUpdateCheckNow() {
+    if (wald_update.status == "checking") return;
+    wald_update.status = "checking";
+    handler.wald_update_cmd("wald-update-check");
 }
 
 function waldSetUpdateDialog(d) {
@@ -298,7 +287,8 @@ function waldSetUpdateDialog(d) {
     app.update();
 }
 
-event click $(#wald-update) {
+// 정보(i)의 [업데이트]·오류 창의 [다시 시도]: 확인 창 없이 바로 받는다.
+function waldUpdateStart() {
     var latest = wald_update.latest || {};
     wald_about_open = false;
     // 받기 주소가 없으면(어드민에 해시·받기 키 설정이 없다) 앱에서 받을 수 없다.
@@ -307,13 +297,13 @@ event click $(#wald-update) {
         waldSetUpdateDialog("error");
         return;
     }
-    waldSetUpdateDialog("confirm");
-}
-
-event click $(#wald-update-ok) {
     wald_update_install_sent = false;
     handler.wald_update_cmd("wald-update-start");
     waldSetUpdateDialog("progress");
+}
+
+event click $(#wald-update) {
+    waldUpdateStart();
 }
 
 event click $(#wald-update-stop) {
@@ -321,15 +311,11 @@ event click $(#wald-update-stop) {
 }
 
 event click $(#wald-update-retry) {
-    waldSetUpdateDialog("confirm");
+    waldUpdateStart();
 }
 
 event click $(#wald-update-close) {
     waldSetUpdateDialog("");
-}
-
-event click $(#wald-update-check) {
-    handler.wald_update_cmd("wald-update-check");
 }
 
 // 업스트림 updatePasswordArea() 가 비밀번호가 바뀔 때 passwordArea.update() 를 부른다.

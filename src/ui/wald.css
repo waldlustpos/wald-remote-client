@@ -429,12 +429,7 @@ div.wald-dialog-actions {
     text-align: right;
 }
 
-/* 앱 안 업데이트(명세 DSK-01 — 결정 D44): 확인·진행·오류 대화상자, 정보의 '최신 버전' 줄 */
-div.wald-update-versions {
-    font-weight: bold;
-    margin-bottom: 12px;
-}
-
+/* 앱 안 업데이트(명세 DSK-01 — 결정 D44): 진행·오류 대화상자, 정보 대화상자의 [닫기][업데이트] 간격 */
 div.wald-update-text {
     margin: 4px 0;
     line-height: 20px;
@@ -459,21 +454,8 @@ div.wald-update-fill {
     background: #171717;
 }
 
-div.wald-update-about {
-    margin: 4px 0;
-}
-
-div.wald-update-btns {
-    margin-top: 6px;
-}
-
-div.wald-update-btns button,
 div.wald-dialog-actions button {
     margin-left: 8px;
-}
-
-div.wald-update-btns button:first-child {
-    margin-left: 0;
 }
 
 /* ---------------------------------------------------------------- 연결 관리(CM) 창 (flutter/lib/desktop/pages/server_page.dart) */

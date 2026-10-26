@@ -52,6 +52,7 @@ Future<void> showWaldAppInfo() async {
   // 데스크탑은 설정 '정보'와 같은 값(Cargo 버전), Android 는 PackageInfo versionName.
   final appVersion = isDesktop ? await bind.mainGetVersion() : version;
   final buildDate = await bind.mainGetBuildDate();
+  final waldUpdate = waldUpdateSupported && bind.isIncomingOnly();
   gFFI.dialogManager.show((setState, close, context) {
     // Windows 수신 전용 홈은 폭 280·높이 약 390 창이라(부록 A-39) 데스크탑은 간격을 줄이고
     // 값은 한 줄로 둔다(넘치면 조금 줄인다 — 빌드 날짜가 두 줄로 꺾여 저작권 줄이 가려졌다).
@@ -87,8 +88,8 @@ Future<void> showWaldAppInfo() async {
         children: [
           infoRow(translate('Version'), appVersion),
           infoRow(translate('Build Date'), buildDate),
-          // Waldlust(DSK-01 — 결정 D44): 수신 전용은 설정이 없어 최신 버전 확인·앱 안 업데이트를 여기 둔다.
-          if (waldUpdateSupported && bind.isIncomingOnly())
+          // Waldlust(DSK-01 — 결정 D44): 수신 전용은 설정·홈 카드가 없어 최신 버전 확인·앱 안 업데이트를 여기 둔다.
+          if (waldUpdate)
             const WaldUpdateAboutRow(compact: true),
           Divider(height: narrow ? 16 : 24),
           // Waldlust(D35): 이 앱이 보내는 정보·오픈소스 고지(자사 공개 페이지).
@@ -103,7 +104,9 @@ Future<void> showWaldAppInfo() async {
           ).marginOnly(top: 12),
         ],
       ),
-      actions: [dialogButton('Close', onPressed: close)],
+      actions: waldUpdate
+          ? waldUpdateInfoActions(close)
+          : [dialogButton('Close', onPressed: close)],
       onCancel: close,
       // 바깥 여백도 줄인다(기본 좌우 40·위아래 24).
       insetPadding: narrow
