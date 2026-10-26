@@ -2805,6 +2805,11 @@ pub fn main_get_printer_names() -> SyncReturn<String> {
 }
 
 pub fn main_get_common(key: String) -> String {
+    // Waldlust(명세 DSK-01 — 앱 안 업데이트): wald-update-* 는 src/wald_update.rs.
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "android"))]
+    if key.starts_with("wald-update-") {
+        return crate::wald_update::get_common(&key);
+    }
     if key == "is-printer-installed" {
         #[cfg(target_os = "windows")]
         {
@@ -2894,6 +2899,11 @@ pub fn main_get_common_sync(key: String) -> SyncReturn<String> {
 }
 
 pub fn main_set_common(_key: String, _value: String) {
+    // Waldlust(명세 DSK-01 — 앱 안 업데이트): wald-update-* 는 src/wald_update.rs.
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "android"))]
+    if _key.starts_with("wald-update-") {
+        return crate::wald_update::set_common(&_key, &_value);
+    }
     #[cfg(target_os = "windows")]
     if _key == "install-printer" && crate::platform::is_win_10_or_greater() {
         std::thread::spawn(move || {

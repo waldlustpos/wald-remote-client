@@ -258,45 +258,6 @@ div.wald-legal-link {
     margin-top: 2px;
 }
 
-/* 설치·업그레이드 카드: n900 바탕·흰 글자, 흰 테두리 버튼 150 */
-div.wald-card {
-    margin: 20px 0;
-    padding: 20px;
-    background: #171717;
-    color: white;
-}
-
-div.wald-card-title {
-    text-align: center;
-    font-size: 15px;
-    font-weight: bold;
-    margin-bottom: 6px;
-}
-
-div.wald-card-text {
-    font-size: 13px;
-    line-height: 20px;
-}
-
-div.wald-card-btns {
-    margin-top: 20px;
-    text-align: center;
-}
-
-button.wald-card-btn {
-    width: 150px;
-    height: 34px;
-    border: white solid 1px;
-    border-radius: 8px;
-    background: transparent;
-    color: white;
-    font-size: 14px;
-}
-
-button.wald-card-btn:hover {
-    background: rgba(255, 255, 255, 0.16);
-}
-
 /* 상태 줄: 구분선(Flutter Divider 높이 16) + 점 8(좌우 14) + 문구 14(폭 226), 아래 6 */
 div.wald-status {
     margin-top: 7px;
@@ -427,6 +388,44 @@ div.wald-info-copyright {
 div.wald-dialog-actions {
     margin-top: 20px;
     text-align: right;
+}
+
+/* 앱 안 업데이트(명세 DSK-01 — 결정 D44): 진행·오류 대화상자, 정보 대화상자의 '최신 버전' 줄([업데이트]가 오른쪽에 붙는다) */
+div.wald-update-row > div {
+    margin-top: *;
+    margin-bottom: *;
+}
+
+div.wald-update-row > button {
+    margin-left: 8px;
+}
+
+div.wald-update-text {
+    margin: 4px 0;
+    line-height: 20px;
+}
+
+div.wald-update-detail {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #737373;
+}
+
+div.wald-update-bar {
+    height: 20px;
+    margin: 12px 0;
+    border-radius: 5px;
+    background: #E0E0E0;
+}
+
+div.wald-update-fill {
+    height: *;
+    border-radius: 5px;
+    background: #171717;
+}
+
+div.wald-dialog-actions button {
+    margin-left: 8px;
 }
 
 /* ---------------------------------------------------------------- 연결 관리(CM) 창 (flutter/lib/desktop/pages/server_page.dart) */

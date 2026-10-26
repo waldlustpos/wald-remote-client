@@ -879,6 +879,16 @@ async fn handle(data: Data, stream: &mut Connection) {
                     // 권위 평문을 받아 대시보드에 보고한다(common.rs send_waldlust_heartbeat 참고).
                     let v = hbb_common::config::LocalConfig::get_option("wald-conn-pw");
                     value = if v.is_empty() { None } else { Some(v) };
+                } else if name.starts_with("wald-update-") {
+                    // Waldlust(DSK-01 — 결정 D44): 현장 Windows 설치본의 앱 안 업데이트는 이 SYSTEM 서버가 한다(src/wald_update.rs).
+                    #[cfg(windows)]
+                    {
+                        value = crate::wald_update::ipc_get(&name);
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        value = None;
+                    }
                 } else {
                     value = None;
                 }
@@ -909,6 +919,11 @@ async fn handle(data: Data, stream: &mut Connection) {
                     crate::audio_service::set_voice_call_input_device(Some(value), true);
                 } else if name == "unlock-pin" {
                     Config::set_unlock_pin(&value);
+                } else if name.starts_with("wald-update-") {
+                    // Waldlust(DSK-01 — 결정 D44): 화면의 확인·받기·취소·설치(src/wald_update.rs). 값은 쓰지 않는다.
+                    #[cfg(windows)]
+                    crate::wald_update::ipc_set(&name);
+                    return;
                 } else {
                     return;
                 }

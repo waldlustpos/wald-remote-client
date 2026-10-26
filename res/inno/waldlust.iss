@@ -114,11 +114,19 @@ Filename: "{app}\Waldlust.exe"; Parameters: "--tray"; Flags: nowait runasorigina
 ; Waldlust(부록 A-40): 설치 완료 화면의 '실행' 체크박스(기본 켬). postinstall 은 로그인 사용자 권한으로 실행된다(관리자 창 방지).
 Filename: "{app}\Waldlust.exe"; Description: "{cm:LaunchProgram,Waldlust 원격지원}"; \
   Flags: nowait postinstall skipifsilent
+; Waldlust(명세 DSK-01 — 앱 안 업데이트): 앱이 /VERYSILENT /WALDUPDATE=1 로 설치하면 위 두 줄(skipifsilent)을 건너뛰므로
+; 트레이와 메인 창을 로그인 사용자 권한으로 다시 띄운다(src/wald_update.rs). 그냥 /VERYSILENT 원격 설치는 그대로다.
+Filename: "{app}\Waldlust.exe"; Parameters: "--tray"; Flags: nowait runasoriginaluser; Check: WaldIsAppUpdate
+Filename: "{app}\Waldlust.exe"; Flags: nowait runasoriginaluser; Check: WaldIsAppUpdate
 
 [UninstallRun]
 ; 제거 시: 서비스 중지·삭제 + 방화벽 규칙 삭제 + 레지스트리 정리.
 Filename: "{app}\Waldlust.exe"; Parameters: "--before-uninstall"; \
   Flags: runhidden waituntilterminated; RunOnceId: "WaldlustBeforeUninstall"
+
+[UninstallDelete]
+; Waldlust(명세 DSK-01 — 결정 D44): 현장 앱 안 업데이트가 받은 설치 파일·로그(src/wald_update.rs — 서비스 설치).
+Type: filesandordirs; Name: "{app}\update"
 
 [Code]
 // Waldlust(부록 A-40): 덮어 설치(업데이트) 때 실행 중인 서비스·서버·트레이·메인 창·CM 을 파일 복사 전에 끈다.
@@ -151,6 +159,12 @@ begin
   end;
   WaldExec('{sys}\taskkill.exe', '/F /IM Waldlust.exe');
   WaldExec('{sys}\taskkill.exe', '/F /IM RuntimeBroker_rustdesk.exe');
+end;
+
+// Waldlust(명세 DSK-01 — 앱 안 업데이트): 앱이 조용한 설치에 /WALDUPDATE=1 을 주었나([Run] 의 다시 띄우기).
+function WaldIsAppUpdate(): Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:WALDUPDATE|0}') = '1');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

@@ -29,6 +29,8 @@ class StateGlobal {
   // Waldlust(결정 D37): 새 버전·어드민 '원격 설치 파일' 주소 — 데스크탑 양방향 홈 카드.
   final waldUpdateVersion = ''.obs;
   final waldUpdateUrl = ''.obs;
+  // Waldlust(명세 DSK-01): 마지막 확인 결과(src/wald_update.rs 상태 JSON — status·latest·checkedAt) — 설정 > 정보.
+  final waldUpdateState = Rx<Map<String, dynamic>>({});
 
   String _inputSource = '';
 

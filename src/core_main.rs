@@ -406,6 +406,9 @@ pub fn core_main() -> Option<Vec<String>> {
             }
             #[cfg(windows)]
             crate::privacy_mode::restore_reg_connectivity(true, false);
+            // Waldlust(DSK-01 — 결정 D44): 현장 앱 안 업데이트 확인, 업데이트 뒤면 트레이·메인 창을 로그인 사용자로 다시 띄운다.
+            #[cfg(windows)]
+            crate::wald_update::on_server_start();
             #[cfg(any(target_os = "linux", target_os = "windows"))]
             {
                 crate::start_server(true, false);

@@ -703,5 +703,7 @@ extension WindowsTargetExt on int {
 }
 
 const kCheckSoftwareUpdateFinish = 'check_software_update_finish';
-// Waldlust(결정 D37): 어드민 /api/app/latest 가 알려 준 새 버전(src/common.rs wald_check_update).
-const kWaldUpdateAvailable = 'wald_update_available';
+// Waldlust(결정 D37·명세 DSK-01): 어드민 /api/app/latest 확인 결과(src/wald_update.rs check).
+const kWaldUpdateState = 'wald_update_state';
+// 앱 안 업데이트로 설치한 버전 — 다시 켜진 앱이 업데이트됐는지 본다(src/wald_update.rs install).
+const kWaldUpdateTarget = 'wald-update-target';

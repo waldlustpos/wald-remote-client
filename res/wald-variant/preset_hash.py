@@ -18,6 +18,11 @@ hbb_common 의 사전 비밀번호 형식(config/permanent_password.rs 의 compu
 
 사용(저장소 루트에서):
   WALDLUST_INCOMING_PASSWORD=... WALDLUST_INCOMING_SALT=... python3 res/wald-variant/preset_hash.py
+
+--field-key-sha256 을 주면 위 두 줄 대신 현장 앱 안 업데이트(결정 D44)의 받기 키 해시 한 줄만 낸다.
+받기 키는 앱이 저장 해시에서 계산한다(src/wald_variant.rs field_update_key — 라벨이 같아야 한다).
+어드민은 키가 아니라 이 SHA-256 만 env APP_FIELD_UPDATE_KEYS_SHA256(쉼표 목록)에 둔다.
+  APP_FIELD_UPDATE_KEYS_SHA256=<SHA-256(받기 키) hex>
 """
 
 import base64
@@ -28,11 +33,17 @@ import sys
 
 MIN_PASSWORD_LEN = 16
 SALT_RE = re.compile(r"^[A-Za-z0-9_-]{16,}$")
+FIELD_KEY_LABEL = "waldlust-field-update-v1:"
 
 
 def storage_of(password: str, salt: str) -> str:
     h1 = hashlib.sha256(password.encode("utf-8") + salt.encode("utf-8")).digest()
     return "00" + base64.b64encode(h1).decode("ascii")
+
+
+def field_key_sha256_of(storage: str) -> str:
+    key = hashlib.sha256((FIELD_KEY_LABEL + storage).encode("utf-8")).hexdigest()
+    return hashlib.sha256(key.encode("ascii")).hexdigest()
 
 
 def main() -> int:
@@ -44,6 +55,9 @@ def main() -> int:
     if not SALT_RE.match(salt):
         print("WALDLUST_INCOMING_SALT 가 없거나 형식이 틀렸다(16자 이상 [A-Za-z0-9_-])", file=sys.stderr)
         return 1
+    if "--field-key-sha256" in sys.argv[1:]:
+        print(f"APP_FIELD_UPDATE_KEYS_SHA256={field_key_sha256_of(storage_of(password, salt))}")
+        return 0
     print(f"WALDLUST_INCOMING_PW_STORAGE={storage_of(password, salt)}")
     print(f"WALDLUST_INCOMING_PW_SALT={salt}")
     return 0

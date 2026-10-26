@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/widgets/wald_account_button.dart';
+import 'package:flutter_hbb/desktop/widgets/wald_update.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
@@ -1026,6 +1027,9 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                   child: Text(_buildDate),
                 ),
                 leading: Icon(waldIcon(Icons.query_builder))),
+            // Waldlust(DSK-12 — 결정 D43): 직원 모바일은 여기서만 최신 버전을 보고 [다운로드](브라우저 — 어드민)로 받는다.
+            if (isAndroid && bind.isOutgoingOnly())
+              CustomSettingsTile(child: const WaldUpdateMobileTile()),
             if (isAndroid)
               SettingsTile(
                   onPressed: (context) => onCopyFingerprint(_fingerprint),

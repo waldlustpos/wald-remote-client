@@ -977,6 +977,18 @@ void androidChannelInit() {
             waldHelperChanged.value++;
             break;
           }
+        // Waldlust(DSK-01 — 결정 D44): 앱 안 업데이트 설치 결과(WaldSelfUpdate.kt). 실패는 Rust 상태로 넘겨 진행 창이 오류를 보인다.
+        case "wald_self_update_changed":
+          {
+            final event = arguments["event"] as String;
+            final message = arguments["message"] as String? ?? '';
+            if (event != "confirm") {
+              bind.mainSetCommon(
+                  key: 'wald-update-fail',
+                  value: '${event == "storage" ? "space" : event}:$message');
+            }
+            break;
+          }
       }
     } catch (e) {
       debugPrintStack(label: "MethodCallHandler err:$e");
