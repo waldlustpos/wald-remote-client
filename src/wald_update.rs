@@ -690,6 +690,15 @@ pub fn on_server_start() {
             log::info!("wald update: updated to {}", crate::VERSION);
         }
         relaunch_ui();
+        // 설치 프로그램은 이 서버가 뜬 뒤에도 잠시 마무리를 하느라 받은 파일을 쥐고 있어 위 start() 가 못 지웠다.
+        for _ in 0..30 {
+            match std::fs::remove_file(dir.join("wald-update.exe")) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                    std::thread::sleep(Duration::from_secs(2))
+                }
+                _ => break,
+            }
+        }
     });
 }
 
