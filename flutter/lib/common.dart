@@ -16,6 +16,7 @@ import 'package:flutter_hbb/common/wald_theme.dart';
 import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/desktop/widgets/wald_mobile_actions.dart';
+import 'package:flutter_hbb/desktop/widgets/wald_update.dart' show waldUpdateSupported;
 import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
@@ -4106,8 +4107,9 @@ void checkUpdate() {
       Timer(const Duration(seconds: 1), () async {
         bind.mainGetSoftwareUpdateUrl();
       });
-    } else if ((isWindows || isMacOS) && !bind.isIncomingOnly()) {
-      // Waldlust(결정 D37): 업스트림 대신 어드민에 묻는다 — 데스크탑 양방향(직원용)만. 같은 바인딩이
+    } else if (waldUpdateSupported) {
+      // Waldlust(결정 D37): 업스트림 대신 어드민에 묻는다 — 데스크탑 양방향(직원용), 그리고 현장 수신 전용 Windows·Android
+      // (결정 D44 — desktop/widgets/wald_update.dart waldUpdateSupported). 같은 바인딩이
       // src/common.rs check_software_update → src/wald_update.rs start(시작 때와 12시간마다)를 연다.
       // 확인 결과는 홈 '새 버전' 카드와 설정 > 정보가 쓴다(명세 DSK-01 — 앱 안 업데이트).
       platformFFI.registerEventHandler(kWaldUpdateState, kWaldUpdateState,

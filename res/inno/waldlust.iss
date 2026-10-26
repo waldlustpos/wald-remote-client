@@ -124,6 +124,10 @@ Filename: "{app}\Waldlust.exe"; Flags: nowait runasoriginaluser; Check: WaldIsAp
 Filename: "{app}\Waldlust.exe"; Parameters: "--before-uninstall"; \
   Flags: runhidden waituntilterminated; RunOnceId: "WaldlustBeforeUninstall"
 
+[UninstallDelete]
+; Waldlust(명세 DSK-01 — 결정 D44): 현장 앱 안 업데이트가 받은 설치 파일·로그(src/wald_update.rs — 서비스 설치).
+Type: filesandordirs; Name: "{app}\update"
+
 [Code]
 // Waldlust(부록 A-40): 덮어 설치(업데이트) 때 실행 중인 서비스·서버·트레이·메인 창·CM 을 파일 복사 전에 끈다.
 //  - 서비스를 먼저 멈춘다. 서비스는 --server 를 다시 띄우고, 서비스 프로세스가 죽으면 sc failure 복구가 5초 뒤

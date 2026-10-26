@@ -15,9 +15,43 @@ import 'package:url_launcher/url_launcher_string.dart';
 // 확인·받기·설치는 Rust(src/wald_update.rs)가 하고, 여기서는 상태(main_get_common 'wald-update-state')를 읽어
 // 홈 '새 버전' 카드의 [업데이트] 대화상자와 설정 > 정보의 '최신 버전' 줄을 그린다.
 // 받기는 앱 로그인 토큰으로 한다 — 로그인하지 않았으면 로그인을 권하거나 어드민 '원격 설치 파일'을 연다.
+// 현장 수신 전용(결정 D44 — 부록 A-62): Windows(서비스가 UAC 없이 설치 — 상태 mode 'service')·Android(시스템 설치 창 — 'android')도
+// 같은 대화상자를 쓴다. 로그인하지 않는다(받기 키). Windows 수신 전용 창은 폭 280 이라 대화상자 바깥 여백을 줄인다.
 
 bool get waldUpdateSupported =>
-    (isWindows || isMacOS) && !bind.isIncomingOnly();
+    ((isWindows || isMacOS) && !bind.isOutgoingOnly()) ||
+    (isAndroid && bind.isIncomingOnly());
+
+/// Windows 수신 전용 홈은 폭 280 창이다(부록 A-39) — 대화상자 바깥 여백을 줄인다(wald_app_info.dart 와 같다).
+EdgeInsets? get _insetPadding => isDesktop && bind.isIncomingOnly()
+    ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+    : null;
+
+/// 확인 창의 설치 안내: 현장 Windows(권한 확인 없음)·Android(시스템 설치 창)·직원용 Windows(UAC)·macOS(관리자 암호).
+String _installTip(String mode) {
+  switch (mode) {
+    case 'service':
+      return 'wald-update-field-tip';
+    case 'android':
+      return 'wald-update-android-tip';
+    default:
+      return isWindows ? 'wald-update-uac-tip' : 'wald-update-mac-tip';
+  }
+}
+
+/// 설치하는 동안의 안내(진행 창).
+String _installingTip(String mode) {
+  switch (mode) {
+    case 'service':
+      return 'wald-update-installing-field-tip';
+    case 'android':
+      return 'wald-update-installing-android-tip';
+    default:
+      return isWindows
+          ? 'wald-update-installing-uac-tip'
+          : 'wald-update-installing-tip';
+  }
+}
 
 Map<String, dynamic> _readState() {
   try {
@@ -57,11 +91,17 @@ Future<void> showWaldUpdateDialog() async {
     if (page.isNotEmpty) launchUrlString(page);
     return;
   }
-  if (bind.mainGetLocalOption(key: 'access_token').isEmpty) {
+  final incoming = bind.isIncomingOnly();
+  if (!incoming && bind.mainGetLocalOption(key: 'access_token').isEmpty) {
     _showLoginNeeded(page);
     return;
   }
-  final subWindows = (await rustDeskWinManager.getAllSubWindowIds()).length;
+  // 수신 전용은 원격 창을 열지 않는다 — 대신 이 기기로 들어온 원격 연결 수(상태 conns)를 알린다.
+  final subWindows = incoming
+      ? 0
+      : (await rustDeskWinManager.getAllSubWindowIds()).length;
+  final conns = s['conns'] is int ? s['conns'] as int : 0;
+  final mode = _str(s, 'mode');
   final changelog = _str(latest, 'changelog');
   gFFI.dialogManager.dismissAll();
   gFFI.dialogManager.show((setState, close, context) {
@@ -83,9 +123,10 @@ Future<void> showWaldUpdateDialog() async {
           if (subWindows > 0)
             Text(translate('wald-update-windows-{$subWindows}-tip'))
                 .marginOnly(top: 4),
-          Text(translate(
-                  isWindows ? 'wald-update-uac-tip' : 'wald-update-mac-tip'))
-              .marginOnly(top: 4),
+          if (conns > 0)
+            Text(translate('wald-update-conns-{$conns}-tip'))
+                .marginOnly(top: 4),
+          Text(translate(_installTip(mode))).marginOnly(top: 4),
           if (changelog.isNotEmpty)
             InkWell(
               onTap: () => launchUrlString(changelog),
@@ -101,6 +142,7 @@ Future<void> showWaldUpdateDialog() async {
       ],
       onSubmit: submit,
       onCancel: close,
+      insetPadding: _insetPadding,
     );
   });
 }
@@ -142,6 +184,7 @@ Future<void> _startUpdate(String page) async {
                 isOutline: true)
             : const SizedBox.shrink()),
       ],
+      insetPadding: _insetPadding,
     );
   }, tag: 'wald-update-progress');
 }
@@ -161,13 +204,35 @@ class _WaldUpdateProgressState extends State<_WaldUpdateProgress> {
   Timer? _timer;
   bool _installSent = false;
   bool _quitSent = false;
+  String _mode = '';
+  // Android: '출처를 알 수 없는 앱' 허용 화면으로 보냈다(돌아오면 Kotlin 이 설치를 이어 간다).
+  bool _sourceSettings = false;
 
   @override
   void initState() {
     super.initState();
-    final job = _readState()['job'];
+    final s = _readState();
+    _mode = _str(s, 'mode');
+    final job = s['job'];
     if (job is Map<String, dynamic>) _job.value = job;
     _timer = Timer.periodic(const Duration(milliseconds: 300), (_) => _poll());
+  }
+
+  /// Android(결정 D44): Rust 가 받아 확인한 APK 를 시스템 설치 창으로 설치한다(WaldSelfUpdate.kt). 설치 창 결과는
+  /// server_page.dart 'wald_self_update_changed' 가 'wald-update-fail' 로 Rust 에 알려 이 창이 오류를 보인다.
+  Future<void> _installAndroid(String file) async {
+    final r = await platformFFI.invokeMethod('wald_self_update_install', file);
+    if (!mounted) return;
+    if (r == 'settings') {
+      setState(() => _sourceSettings = true);
+    } else if (r is String && r.startsWith('error:')) {
+      final reason = r.substring('error:'.length);
+      bind.mainSetCommon(
+          key: 'wald-update-fail',
+          value: reason == 'path' ? 'install:$reason' : 'verify:$reason');
+    } else if (r != 'started') {
+      bind.mainSetCommon(key: 'wald-update-fail', value: 'install:$r');
+    }
   }
 
   @override
@@ -177,14 +242,17 @@ class _WaldUpdateProgressState extends State<_WaldUpdateProgress> {
   }
 
   void _poll() {
-    final job = _readState()['job'];
+    final s = _readState();
+    final job = s['job'];
     if (job is! Map<String, dynamic>) return;
+    _mode = _str(s, 'mode');
     _job.value = job;
     switch (job['state']) {
       case 'ready':
         if (!_installSent) {
           _installSent = true;
           bind.mainSetCommon(key: 'wald-update-install', value: '');
+          if (isAndroid) _installAndroid(_str(job, 'file'));
         }
         break;
       case 'quit':
@@ -230,9 +298,9 @@ class _WaldUpdateProgressState extends State<_WaldUpdateProgress> {
         text = translate('wald-update-installed-tip');
         break;
       default: // ready·installing·quit
-        text = translate(isWindows
-            ? 'wald-update-installing-uac-tip'
-            : 'wald-update-installing-tip');
+        text = translate(_sourceSettings
+            ? 'wald-update-android-settings-tip'
+            : _installingTip(_mode));
     }
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -279,7 +347,8 @@ void _showError(String code, String detail, String page) {
       ),
       actions: [
         dialogButton('Close', onPressed: close, isOutline: true),
-        if (page.isNotEmpty)
+        // 현장 기기에서는 어드민에 로그인하지 않는다.
+        if (page.isNotEmpty && !bind.isIncomingOnly())
           dialogButton('wald-update-open-admin', onPressed: () {
             close();
             launchUrlString(page);
@@ -290,13 +359,16 @@ void _showError(String code, String detail, String page) {
         }),
       ],
       onCancel: close,
+      insetPadding: _insetPadding,
     );
   });
 }
 
 /// 설정 > 정보의 '최신 버전' 줄 — 처음 그릴 때 확인한다(1분 안에 확인했으면 그 결과를 쓴다).
 class WaldUpdateAboutRow extends StatefulWidget {
-  const WaldUpdateAboutRow({super.key});
+  /// 수신 전용 ⓘ 정보 대화상자(결정 D44 — 좁은 창): 줄을 나눠 쌓고 버튼은 아래 줄에 둔다.
+  final bool compact;
+  const WaldUpdateAboutRow({super.key, this.compact = false});
 
   @override
   State<WaldUpdateAboutRow> createState() => _WaldUpdateAboutRowState();
@@ -341,6 +413,30 @@ class _WaldUpdateAboutRowState extends State<WaldUpdateAboutRow> {
           text = '-';
       }
       const linkStyle = TextStyle(decoration: TextDecoration.underline);
+      if (widget.compact) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${translate('wald-update-latest-label')}: $text',
+                style: status == 'available'
+                    ? const TextStyle(fontWeight: FontWeight.w600)
+                    : null),
+            if (checkedAt > 0)
+              Text(
+                '${translate('wald-update-checked-at')}: ${DateTime.fromMillisecondsSinceEpoch(checkedAt).toString().substring(5, 16)}',
+                style: const TextStyle(
+                    fontSize: 12, color: WaldPalette.neutral500),
+              ).marginOnly(top: 2),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              dialogButton('wald-update-check',
+                  onPressed: status == 'checking' ? null : waldUpdateCheckNow,
+                  isOutline: true),
+              if (status == 'available')
+                dialogButton('Update', onPressed: showWaldUpdateDialog),
+            ]).marginOnly(top: 6),
+          ],
+        ).marginSymmetric(vertical: 4.0);
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

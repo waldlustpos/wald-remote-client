@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../common.dart';
+import '../../desktop/widgets/wald_update.dart';
 import '../../models/platform_model.dart';
 
 // Waldlust(DSK-07·DSK-10 — 명세 부록 A-38): 화면에 쓰는 앱 이름. 런처 라벨(AndroidManifest
@@ -86,6 +87,9 @@ Future<void> showWaldAppInfo() async {
         children: [
           infoRow(translate('Version'), appVersion),
           infoRow(translate('Build Date'), buildDate),
+          // Waldlust(DSK-01 — 결정 D44): 수신 전용은 설정이 없어 최신 버전 확인·앱 안 업데이트를 여기 둔다.
+          if (waldUpdateSupported && bind.isIncomingOnly())
+            const WaldUpdateAboutRow(compact: true),
           Divider(height: narrow ? 16 : 24),
           // Waldlust(D35): 이 앱이 보내는 정보·오픈소스 고지(자사 공개 페이지).
           link(translate('Privacy Statement'), kWaldPrivacyUrl),

@@ -54,6 +54,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   var watchIsCanRecordAudio = false;
   (bool, bool, bool)? _waldMacPermissions; // 부록 A-53
   Timer? _updateTimer;
+  // Waldlust(DSK-01 — 결정 D44): 수신 전용 창 높이를 새 버전 카드에 맞춘다(카드는 확인 결과가 온 뒤 생긴다).
+  Worker? _waldUpdateWorker;
   bool isCardClosed = false;
 
   final RxBool _editHover = false.obs;
@@ -470,13 +472,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     // Waldlust(결정 D37): 어드민이 알려 준 새 버전 — 데스크탑 양방향만(common.dart checkUpdate). [업데이트] = 앱 안에서 받아
     // 설치(명세 DSK-01 — desktop/widgets/wald_update.dart), 닫으면 그 버전은 다시 보이지 않는다(로컬 옵션 wald-update-dismissed-<버전>).
     final waldVer = stateGlobal.waldUpdateVersion.value;
+    Widget? waldCard;
     if (waldVer.isNotEmpty &&
         !isCardClosed &&
-        !bind.isIncomingOnly() &&
         bind.mainGetLocalOption(key: 'wald-update-dismissed-$waldVer') != 'N') {
-      return buildInstallCard("wald-update-title", "wald-update-{$waldVer}-tip", "Update",
+      waldCard = buildInstallCard("wald-update-title", "wald-update-{$waldVer}-tip", "Update",
           showWaldUpdateDialog,
           closeButton: true, closeOption: 'wald-update-dismissed-$waldVer');
+      // 현장 수신 전용(결정 D44)은 카드 아래 [종료]를 남긴다(아래 isIncomingOnly 분기).
+      if (!bind.isIncomingOnly()) return waldCard;
     }
     if (systemError.isNotEmpty) {
       return buildInstallCard("", systemError, "", () {});
@@ -578,7 +582,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     }
     if (bind.isIncomingOnly()) {
-      return Align(
+      final quit = Align(
         alignment: Alignment.centerRight,
         child: OutlinedButton(
           onPressed: () {
@@ -592,6 +596,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           child: Text(translate('Quit'), strutStyle: waldButtonStrut()),
         ),
       ).marginAll(14);
+      return waldCard == null ? quit : Column(children: [waldCard, quit]);
     }
     return Container();
   }
@@ -713,6 +718,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void initState() {
     super.initState();
+    if (bind.isIncomingOnly()) {
+      _waldUpdateWorker = ever(stateGlobal.waldUpdateVersion, (_) {
+        if (isInHomePage()) {
+          Future.delayed(const Duration(milliseconds: 300), _updateWindowSize);
+        }
+      });
+    }
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();
@@ -909,6 +921,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void dispose() {
     _uniLinksSubscription?.cancel();
+    _waldUpdateWorker?.dispose();
     Get.delete<RxBool>(tag: 'stop-service');
     _updateTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);

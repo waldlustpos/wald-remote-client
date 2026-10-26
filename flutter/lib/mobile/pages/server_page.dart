@@ -14,6 +14,7 @@ import '../../consts.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import '../widgets/wald_helper_card.dart';
+import '../widgets/wald_update_card.dart';
 import 'home_page.dart';
 
 class ServerPage extends StatefulWidget implements PageShape {
@@ -216,6 +217,9 @@ class _ServerPageState extends State<ServerPage> {
                             : ServiceNotRunningNotification(),
                         const ConnectionManager(),
                         const PermissionChecker(),
+                        // Waldlust(DSK-01 — 결정 D44): 새 버전이 있으면 앱 안 업데이트.
+                        if (isAndroid && bind.isIncomingOnly())
+                          const WaldUpdateCard(),
                         // Waldlust(DSK-02 — 결정 D40): 도우미 앱·adb 1회 설정 상태와 도우미 설치.
                         if (isAndroid && bind.isIncomingOnly())
                           const WaldHelperCard(),
@@ -975,6 +979,18 @@ void androidChannelInit() {
                   timeout: const Duration(seconds: 10));
             }
             waldHelperChanged.value++;
+            break;
+          }
+        // Waldlust(DSK-01 — 결정 D44): 앱 안 업데이트 설치 결과(WaldSelfUpdate.kt). 실패는 Rust 상태로 넘겨 진행 창이 오류를 보인다.
+        case "wald_self_update_changed":
+          {
+            final event = arguments["event"] as String;
+            final message = arguments["message"] as String? ?? '';
+            if (event != "confirm") {
+              bind.mainSetCommon(
+                  key: 'wald-update-fail',
+                  value: '${event == "storage" ? "space" : event}:$message');
+            }
             break;
           }
       }

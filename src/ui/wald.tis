@@ -49,6 +49,7 @@ function waldInitHomeWindow() {
     view.windowIcon = null;
     self.attributes.addClass("wald-incoming");
     waldFitHomeLoop();
+    waldUpdateLoop();
 }
 
 // 상태 문구가 줄바꿈되거나 카드가 바뀌면 높이가 달라진다(Flutter `_updateWindowSize` 와 같은 역할).
@@ -119,6 +120,7 @@ function waldAbout() {
             <div .wald-dialog-title>{translate('wald-app-display-name')}</div>
             <div .wald-info-row><div .wald-info-label>{translate('Version')}</div><div .wald-info-value>{handler.get_version()}</div></div>
             <div .wald-info-row><div .wald-info-label>{translate('Build Date')}</div><div .wald-info-value>{handler.get_build_date()}</div></div>
+            {waldUpdateAboutRow()}
             <div .wald-dialog-divider />
             <div .wald-info-link #wald-about-privacy>{translate('Privacy Statement')}{wald_svg.externalLink}</div>
             <div .wald-info-link #wald-about-oss>{translate('Open source notices')}{wald_svg.externalLink}</div>
@@ -172,7 +174,162 @@ function waldHelpCard() {
             </div>;
         }
     }
-    return <div .wald-quit-row><button .wald-btn-outline #wald-quit>{translate('Quit')}</button></div>;
+    var quit = <div .wald-quit-row><button .wald-btn-outline #wald-quit>{translate('Quit')}</button></div>;
+    // 결정 D44: 새 버전이 있으면 종료 줄 위에 카드(Flutter buildHelpCards 의 수신 전용 카드와 같다).
+    var latest = wald_update.latest || {};
+    if (wald_update.status == "available" && latest.version) {
+        return <div>
+            <div .wald-card>
+                <div .wald-card-title>{translate('wald-update-title')}</div>
+                <div .wald-card-text>{translate('wald-update-{' + latest.version + '}-tip')}</div>
+                <div .wald-card-btns><button .wald-card-btn #wald-update>{translate('Update')}</button></div>
+            </div>
+            {quit}
+        </div>;
+    }
+    return quit;
+}
+
+// ---------------------------------------------------------------- 앱 안 업데이트(명세 DSK-01 — 결정 D44, 부록 A-62)
+// 확인·받기·설치는 Rust(src/wald_update.rs)가 한다. 설치본이면 서비스(SYSTEM)가 UAC 없이 조용히 설치하고 앱을 다시 띄운다.
+// 이 화면은 handler.wald_update_state()(캐시 — 막지 않는다)를 읽어 그리고, handler.wald_update_cmd(키)로 시작·취소·설치를 보낸다.
+// 문구·흐름은 Flutter desktop/widgets/wald_update.dart 와 같다.
+var wald_update = {};
+var wald_update_raw = "";
+var wald_update_dialog = ""; // "" | confirm | progress | error
+var wald_update_install_sent = false;
+
+function waldUpdateLoop() {
+    self.timer(wald_update_dialog == "progress" ? 500ms : 2s, function() {
+        waldUpdatePoll();
+        waldUpdateLoop();
+    });
+}
+
+function waldUpdatePoll() {
+    var raw = handler.wald_update_state();
+    if (!raw || raw == wald_update_raw) return;
+    wald_update_raw = raw;
+    try { wald_update = JSON.parse(raw); } catch(e) { wald_update = {}; }
+    var job = wald_update.job || {};
+    if (wald_update_dialog == "progress") {
+        if (job.state == "ready" && !wald_update_install_sent) {
+            wald_update_install_sent = true;
+            handler.wald_update_cmd("wald-update-install");
+        } else if (job.state == "error") {
+            wald_update_dialog = "error";
+        } else if (job.state == "idle") {
+            wald_update_dialog = ""; // 받기 취소
+        }
+    }
+    app.update();
+}
+
+function waldUpdateMb(b) {
+    return String.printf("%.1f", (b || 0) / 1048576.0);
+}
+
+function waldUpdateDialog() {
+    var latest = wald_update.latest || {};
+    var job = wald_update.job || {};
+    var body;
+    var actions;
+    if (wald_update_dialog == "confirm") {
+        var conns = wald_update.conns || 0;
+        body = <div>
+            <div .wald-update-versions>{wald_update.current + "  ->  " + latest.version}</div>
+            <div .wald-update-text>{translate('wald-update-confirm-tip')}</div>
+            {conns > 0 ? <div .wald-update-text>{translate('wald-update-conns-{' + conns + '}-tip')}</div> : ""}
+            <div .wald-update-text>{translate(wald_update.mode == "service" ? 'wald-update-field-tip' : 'wald-update-uac-tip')}</div>
+        </div>;
+        actions = [<button .wald-btn-outline #wald-update-close>{translate('Cancel')}</button>,
+            <button .wald-btn-primary #wald-update-ok>{translate('Update')}</button>];
+    } else if (wald_update_dialog == "progress") {
+        var text;
+        if (job.state == "downloading") {
+            text = translate('wald-update-downloading') + (job.total > 0 ? "  " + waldUpdateMb(job.done) + " / " + waldUpdateMb(job.total) + " MB" : "");
+        } else if (job.state == "verifying") {
+            text = translate('wald-update-verifying');
+        } else {
+            text = translate(wald_update.mode == "service" ? 'wald-update-installing-field-tip' : 'wald-update-installing-uac-tip');
+        }
+        var pct = job.state == "downloading" && job.total > 0 ? (job.done * 100 / job.total) : 100;
+        body = <div>
+            <div .wald-update-bar><div .wald-update-fill style={"width:" + pct + "%"} /></div>
+            <div .wald-update-text>{text}</div>
+        </div>;
+        actions = job.state == "downloading" ? [<button .wald-btn-outline #wald-update-stop>{translate('Cancel')}</button>] : [];
+    } else {
+        body = <div>
+            <div .wald-update-text>{translate('wald-update-error-' + (job.error || 'install'))}</div>
+            {job.detail ? <div .wald-update-detail>{job.detail}</div> : ""}
+        </div>;
+        actions = [<button .wald-btn-outline #wald-update-close>{translate('Close')}</button>,
+            <button .wald-btn-primary #wald-update-retry>{translate('Retry')}</button>];
+    }
+    return <div .wald-dialog-mask>
+        <div .wald-dialog>
+            <div .wald-dialog-title>{translate('wald-update-dialog-title')}</div>
+            {body}
+            <div .wald-dialog-actions>{actions}</div>
+        </div>
+    </div>;
+}
+
+// 정보(i) 대화상자의 '최신 버전' 줄 + [업데이트 확인]·[업데이트].
+function waldUpdateAboutRow() {
+    var status = wald_update.status;
+    var latest = wald_update.latest || {};
+    var text = status == "checking" ? translate('wald-update-checking')
+        : status == "available" ? translate('wald-update-new-{' + latest.version + '}')
+        : status == "latest" ? translate('wald-update-is-latest')
+        : status == "error" ? translate('wald-update-check-failed') : "-";
+    return <div .wald-update-about>
+        <div .wald-update-text>{translate('wald-update-latest-label') + ": " + text}</div>
+        <div .wald-update-btns>
+            <button .wald-btn-outline #wald-update-check>{translate('wald-update-check')}</button>
+            {status == "available" ? <button .wald-btn-primary #wald-update>{translate('Update')}</button> : ""}
+        </div>
+    </div>;
+}
+
+function waldSetUpdateDialog(d) {
+    wald_update_dialog = d;
+    app.update();
+}
+
+event click $(#wald-update) {
+    var latest = wald_update.latest || {};
+    wald_about_open = false;
+    // 받기 주소가 없으면(어드민에 해시·받기 키 설정이 없다) 앱에서 받을 수 없다.
+    if (!latest.download) {
+        wald_update.job = { state: "error", error: "unavailable" };
+        waldSetUpdateDialog("error");
+        return;
+    }
+    waldSetUpdateDialog("confirm");
+}
+
+event click $(#wald-update-ok) {
+    wald_update_install_sent = false;
+    handler.wald_update_cmd("wald-update-start");
+    waldSetUpdateDialog("progress");
+}
+
+event click $(#wald-update-stop) {
+    handler.wald_update_cmd("wald-update-cancel");
+}
+
+event click $(#wald-update-retry) {
+    waldSetUpdateDialog("confirm");
+}
+
+event click $(#wald-update-close) {
+    waldSetUpdateDialog("");
+}
+
+event click $(#wald-update-check) {
+    handler.wald_update_cmd("wald-update-check");
 }
 
 // 업스트림 updatePasswordArea() 가 비밀번호가 바뀔 때 passwordArea.update() 를 부른다.

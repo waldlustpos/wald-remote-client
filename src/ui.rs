@@ -535,6 +535,21 @@ impl UI {
         crate::BUILD_DATE.to_owned()
     }
 
+    // Waldlust(DSK-01 — 결정 D44): 32비트 수신 전용 앱 안 업데이트(wald.tis 가 2초마다 읽는다 — 캐시라 막지 않는다).
+    fn wald_update_state(&self) -> String {
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        return crate::wald_update::get_common("wald-update-state");
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        String::new()
+    }
+
+    fn wald_update_cmd(&self, key: String) {
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        crate::wald_update::set_common(&key, "");
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        let _ = key;
+    }
+
     fn get_fingerprint(&self) -> String {
         get_fingerprint()
     }
@@ -796,6 +811,8 @@ impl sciter::EventHandler for UI {
         fn get_new_version();
         fn get_version();
         fn get_build_date();
+        fn wald_update_state();
+        fn wald_update_cmd(String);
         fn get_fingerprint();
         fn update_me(String);
         fn show_run_without_install();

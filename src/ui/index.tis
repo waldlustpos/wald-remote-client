@@ -717,6 +717,7 @@ class App: Reactor.Component
             <WaldConnectStatus @{this.connect_status} />
             <div #overlay style="position: absolute;size:*;background:black;opacity:0.5;display:none" />
             {wald_about_open ? waldAbout() : ""}
+            {wald_update_dialog ? waldUpdateDialog() : ""}
         </div>;
         var is_can_screen_recording = handler.is_can_screen_recording(false);
         return

@@ -218,7 +218,7 @@ fn measure_server_latency() -> i64 {
 // 저장공간(전체, 여유 — 바이트). 앱과 OS 가 놓인 볼륨 하나만 본다: Android = 내부 저장소(/data),
 // Windows = 시스템 드라이브(%SystemDrive%), 그 밖 = 루트(/). 여유는 앱이 쓸 수 있는 양이다(예약 블록 제외).
 // 읽지 못하면 None — heartbeat 에서 필드를 뺀다. 보고는 운영 어드민 규약대로 diskUsed(= 전체 − 여유)·diskTotal.
-fn waldlust_disk_space() -> Option<(u64, u64)> {
+pub(crate) fn waldlust_disk_space() -> Option<(u64, u64)> {
     #[cfg(windows)]
     {
         use windows::{core::PCWSTR, Win32::Storage::FileSystem::GetDiskFreeSpaceExW};
@@ -1263,10 +1263,9 @@ pub fn check_software_update() {
         // Waldlust(결정 D37): 업스트림(api.rustdesk.com) 대신 어드민에 묻는다. 데스크탑 양방향(직원용)만 —
         // 현장 수신 전용은 매장 직원이 설치 파일을 받을 수 없어 어드민 클라이언트 [상세]의 '최신'으로 관리한다.
         // 앱 안 업데이트(받기·설치)도 같은 모듈이다(src/wald_update.rs — 명세 DSK-01, 2026-10-23).
-        #[cfg(any(target_os = "windows", target_os = "macos"))]
-        if !crate::wald_variant::is_incoming() {
-            crate::wald_update::start();
-        }
+        // 2026-10-26(결정 D44): 현장 수신 전용 Windows·Android 도 앱 안에서 업데이트한다(빌드 구분은 wald_update::start).
+        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "android"))]
+        crate::wald_update::start();
         return;
     }
     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
