@@ -273,11 +273,11 @@ if [ "$VARIANT" = outgoing ]; then
   PERMS=$("$BT/aapt2" dump permissions "$APK")
   LEFT=""
   for p in QUERY_ALL_PACKAGES SYSTEM_ALERT_WINDOW REQUEST_IGNORE_BATTERY_OPTIMIZATIONS RECEIVE_BOOT_COMPLETED WRITE_SECURE_SETTINGS \
-           REQUEST_INSTALL_PACKAGES FOREGROUND_SERVICE INPUT_BRIDGE CAMERA; do
+           REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION FOREGROUND_SERVICE INPUT_BRIDGE CAMERA; do
     echo "$PERMS" | grep -qE "\.$p\b" && LEFT="$LEFT $p"
   done
   XML=$("$BT/aapt2" dump xmltree --file AndroidManifest.xml "$APK")
-  for c in android.accessibilityservice BootReceiver MainService FloatingWindowService WaldWakeActivity; do
+  for c in android.accessibilityservice BootReceiver MainService FloatingWindowService WaldWakeActivity WaldSelfUpdate WaldUpdatedReceiver; do
     echo "$XML" | grep -qF "$c" && LEFT="$LEFT $c"
   done
   [ -z "$LEFT" ] || die "발신 전용 APK 에 아직 있다:$LEFT"

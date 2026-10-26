@@ -1,15 +1,15 @@
 #!/bin/zsh
-# Waldlust(wald-remote-client) iOS 로컬 빌드 — Apple Silicon 호스트. arm64 시뮬레이터 앱과 기기용 Ad Hoc .ipa(명세 DSK-12, 인계 DSK-12_MOBILE.md §3·§6).
+# Waldlust(wald-remote-client) iOS 로컬 빌드 — Apple Silicon 호스트. arm64 시뮬레이터 앱과 기기용 .ipa(Ad Hoc·Development 서명, 명세 DSK-12, 인계 DSK-12_MOBILE.md §3·§6).
 # CI 원본: .github/workflows/flutter-build.yml 의 iOS 잡(기기 aarch64-apple-ios — 업스트림에는 시뮬레이터 경로가 없다).
 #
-# 사용:  zsh ~/wald-build/build-ios-local.sh [커밋·브랜치·태그] [dummy|mock|prodtest|release] [bidirectional|outgoing] [simulator|device]
-#        (기본 waldlust, mock, bidirectional, simulator — release 는 device·outgoing 만)
+# 사용:  zsh ~/wald-build/build-ios-local.sh [커밋·브랜치·태그] [dummy|mock|prodtest|release] [bidirectional|outgoing] [simulator|device] [adhoc|development|personal]
+#        (기본 waldlust, mock, bidirectional, simulator, adhoc — release 는 device·outgoing 만, personal 은 release 아님)
 #        ref 의 iOS 프로젝트에 Rust 링크 경로 변수(WALD_RUST_TARGET — feat/dsk-12-ios 7d402103c)가 있어야 한다.
 # 결과:  simulator: ~/wald-build/dist/<버전>-<sha9>-<대상>/waldlust-remote[-mobile]-<버전>-ios-simulator-<대상>.app + manifest-ios-simulator-<변형>.txt
 #          설치·실행: xcrun simctl install booted <app> && xcrun simctl launch booted co.kr.waldlust.remote
 #        device:    ~/wald-build/dist/<버전>-<sha9>-<대상>/waldlust-remote[-mobile]-<버전>-ios[-<대상>].ipa + manifest-ios-<변형>.txt
 #          (release 는 대상 이름을 붙이지 않는다 — D36. outgoing = 모바일, 설치 파일 이름 '-mobile' — D43 (5))
-#          Ad Hoc 서명 — 프로필에 등록한 iPhone 에만 설치된다(Finder·Apple Configurator 로 .ipa 를 끌어 놓는다).
+#          Ad Hoc 또는 Development 서명 — 프로필에 등록한 iPhone 에만 설치된다(Finder·Apple Configurator 로 .ipa 를 끌어 놓는다).
 #        로그: ~/wald-build/logs/ios-*.log
 #
 # 원칙(build-macos-local.sh 와 같다)
@@ -22,7 +22,7 @@
 #          (wald-remote-docs/tools/rd-mock — 시뮬레이터는 Mac 의 127.0.0.1 에 바로 닿는다. 앱을 띄우기 전에 먼저 띄운다)
 #   prodtest: 운영 서버로 보내는 시험 빌드(macOS·Android 의 prodtest 와 같다 — 결정 C4). heartbeat = https://remote.waldpay.co.kr/api/heartbeat,
 #          WALDLUST_API_SERVER = https://remote.waldpay.co.kr/rd. 운영 어드민 목록에 '미지정'으로 올라간다. 현장 배포용이 아니다.
-#   release: 정식 모바일 배포본(결정 D43 — 2026-10-23 사용자: 1.5.6 r2 부터, Ad Hoc). 주소는 prodtest 와 같다.
+#   release: 정식 모바일 배포본(결정 D43 — 2026-10-23 사용자: 1.5.6 r2 부터, Ad Hoc → 10-26 배포 인증서 한도로 Development). 주소는 prodtest 와 같다.
 #          ref 는 waldlustpos(origin)에 푸시된 wald-v<버전>-r<N> 태그만, 태그 버전 = 소스 버전(D36).
 #          CFBundleVersion(빌드 번호) = Android versionCode 와 같은 식 M×1,000,000 + m×10,000 + p×100 + r.
 #          dist 에 NOTICE·LICENCE·THIRD_PARTY_NOTICES-ios.txt(cargo-about 0.6.4 필요).
@@ -32,9 +32,18 @@
 #   설치 루트 시뮬레이터 ~/vcpkg-ios-sim · 기기 ~/vcpkg-ios-dev(둘 다 폴더 이름이 arm64-ios 라 루트를 나눈다).
 # - 전역 Flutter 설정(~/.config/flutter/settings)은 iOS 를 꺼 두었다(enable-ios false). 이 스크립트만 XDG_CONFIG_HOME 으로 켠다.
 #
-# 기기(device) 서명 — Ad Hoc(2026-10-23 사용자 결정: App Store Connect API 팀 키로 자격을 만든다)
-# - 자격은 ios-adhoc-signing.py 가 만든다: login keychain 의 'Apple Distribution: Waldlust Co., Ltd. (GFY79GHBW8)' 와
-#   ~/wald-build/keys/ios-adhoc.mobileprovision(App ID co.kr.waldlust.remote, 등록 기기). 기기를 더하면 그 스크립트로 프로필을 다시 만든다.
+# 기기(device) 서명 — 다섯째 인자(2026-10-23 사용자 결정: App Store Connect API 팀 키로 자격을 만든다)
+# - adhoc: login keychain 의 'Apple Distribution: Waldlust Co., Ltd. (GFY79GHBW8)' + ~/wald-build/keys/ios-adhoc.mobileprovision,
+#   내보내기 release-testing, get-task-allow false·aps-environment production.
+# - development(2026-10-26 사용자 결정 — 팀 배포 인증서가 한도 3개라 새로 못 만든다): 'Apple Development: …' +
+#   ~/wald-build/keys/ios-development.mobileprovision, 내보내기 debugging, get-task-allow true·aps-environment development.
+# - 자격은 ios-adhoc-signing.py [--development] --apply 가 만든다(App ID co.kr.waldlust.remote, 등록 기기). 기기를 더하면 프로필을 다시 만든다.
+#   서명 ID 는 이름이 아니라 프로필 안 인증서의 SHA-1 로 keychain 에서 찾는다.
+# - personal(2026-10-26 사용자 결정 — 회사 팀은 iPhone 등록 한도라 개인 폰을 못 넣는다): Xcode > 설정 > 계정에 넣은 개인 Apple ID 의
+#   무료 팀으로 자동 서명. 시험 전용(release 안 됨) — 번들 ID co.kr.waldlust.remote.devtest(정식본과 따로 깔린다), 엔타이틀먼트 비움
+#   (무료 팀은 푸시를 못 쓴다 — Wi-Fi 정보도 뺀다), 프로필 7일·기기 등록은 xcodebuild -allowProvisioningDeviceRegistration 이 한다.
+#   Mac 에 연결한 iPhone 하나(둘 이상이면 WALD_IOS_DEVICE=<UDID>), 개인 팀이 둘 이상이면 WALD_IOS_PERSONAL_TEAM. 결과는 .app —
+#   xcrun devicectl device install app --device <UDID> <app>, 첫 실행 전 iPhone 설정 > 일반 > VPN 및 기기 관리에서 개발자 앱 신뢰.
 # - 포크의 Xcode 프로젝트는 자동 서명 그대로 두고, 빌드 worktree 의 Runner 타깃 설정에만 수동 서명(인증서·프로필 이름)을 넣는다.
 #
 # 시뮬레이터에서만 생기는 것과 처리(포크 소스·vcpkg 포트는 고치지 않는다 — 기기·다른 OS 빌드 그대로)
@@ -70,9 +79,15 @@ BASE="${1:-waldlust}"
 TARGET="${2:-mock}"
 VARIANT="${3:-bidirectional}"
 MODE="${4:-simulator}"
+SIGNING="${5:-adhoc}"
 case "$TARGET" in dummy|mock|prodtest|release) ;; *) echo "FAIL: 대상은 dummy·mock·prodtest·release"; exit 1 ;; esac
 case "$VARIANT" in bidirectional|outgoing) ;; *) echo "FAIL: 변형은 bidirectional·outgoing"; exit 1 ;; esac
 case "$MODE" in simulator|device) ;; *) echo "FAIL: 넷째 인자는 simulator·device"; exit 1 ;; esac
+case "$SIGNING" in adhoc|development|personal) ;; *) echo "FAIL: 다섯째 인자는 adhoc·development·personal"; exit 1 ;; esac
+if [ "$SIGNING" = personal ]; then
+  [ "$TARGET" != release ] || { echo "FAIL: personal(개인 팀) 서명은 시험 전용 — release 안 됨"; exit 1; }
+  [ "$MODE" = device ] || { echo "FAIL: personal 은 기기(device) 빌드만"; exit 1; }
+fi
 if [ "$TARGET" = release ]; then
   [ "$VARIANT" = outgoing ] || { echo "FAIL: iOS release 는 모바일(outgoing)만 — D43"; exit 1; }
   [ "${4:-device}" = device ] || { echo "FAIL: release 는 기기(device) 빌드만"; exit 1; }
@@ -83,9 +98,17 @@ TSUF="-$TARGET"; [ "$TARGET" = release ] && TSUF=""         # D36 — 정식본�
 PROD=""; { [ "$TARGET" = prodtest ] || [ "$TARGET" = release ]; } && PROD=1   # 운영 주소로 빌드한다
 FLUTTER_BIN="$HOME/fvm/versions/3.24.5/bin"
 MIN_IOS=15.0
-TEAM=GFY79GHBW8
-SIGN_ID="Apple Distribution: Waldlust Co., Ltd. ($TEAM)"
-PROFILE_SRC="$KEYS/ios-adhoc.mobileprovision"
+TEAM=GFY79GHBW8                 # personal 이면 signing 단계에서 개인 팀으로 바뀐다
+APP_BUNDLE=co.kr.waldlust.remote
+if [ "$SIGNING" = personal ]; then
+  SIGN_KIND="Apple Development"; P_KIND="Personal Team"; WANT_GTA=true; SIGN_ID=""; APP_BUNDLE=co.kr.waldlust.remote.devtest
+elif [ "$SIGNING" = development ]; then
+  SIGN_KIND="Apple Development"; P_KIND=Development; PROFILE_SRC="$KEYS/ios-development.mobileprovision"
+  EXPORT_METHOD=debugging; WANT_GTA=true; WANT_APS=development; SIGN_ID=""   # 이름은 인증서마다 다르다 — 프로필에서 찾는다
+else
+  SIGN_KIND="Apple Distribution"; P_KIND="Ad Hoc"; PROFILE_SRC="$KEYS/ios-adhoc.mobileprovision"
+  EXPORT_METHOD=release-testing; WANT_GTA=false; WANT_APS=production; SIGN_ID="Apple Distribution: Waldlust Co., Ltd. ($TEAM)"
+fi
 VCPKG_TOOL="$HOME/vcpkg-ios"
 if [ "$MODE" = device ]; then
   RUST_TARGET=aarch64-apple-ios; SDK_NAME=iphoneos; INST_ROOT="$HOME/vcpkg-ios-dev"; WANT_PLAT=2
@@ -260,58 +283,134 @@ step "cargo $RUST_TARGET ($FEATURES)"
 [ -f "target/$RUST_TARGET/release/liblibrustdesk.a" ] || die "liblibrustdesk.a 가 없다"
 
 # 기기: 서명 자격(ios-adhoc-signing.py 가 만든 것)을 확인하고 프로필을 Xcode 에 설치한다. 네이티브(vcpkg·Rust)는 자격 없이도 먼저 빌드된다.
-if [ "$MODE" = device ]; then
+# personal 은 Xcode 계정의 개인(무료) 팀과 연결된 iPhone 을 찾는다 — 프로필은 xcodebuild 가 만든다.
+if [ "$MODE" = device ] && [ "$SIGNING" = personal ]; then
+  step "signing (personal team)"
+  PTEAMS=$(defaults export com.apple.dt.Xcode - 2>/dev/null | python3 -I -c '
+import plistlib, sys
+d = plistlib.loads(sys.stdin.buffer.read())
+for teams in (d.get("IDEProvisioningTeamByIdentifier") or {}).values():
+    for t in teams:
+        if t.get("isFreeProvisioningTeam"):
+            print(t.get("teamID"))
+' | sort -u)
+  if [ -z "$PTEAMS" ]; then
+    # Xcode 27 은 팀 목록을 환경설정에 남기지 않는다 → keychain 의 'Apple Development' 서명 ID 중 회사 팀이 아닌 인증서의 OU(= 팀 ID).
+    # 개인 팀 인증서는 Xcode > 설정 > Apple Accounts > Manage Certificates… > + > Apple Development 로 만든다.
+    PTEAMS=$(security find-identity -v -p codesigning | awk -F'"' '/"Apple Development: /{print $2}' | while read -r n; do
+      security find-certificate -c "$n" -p | openssl x509 -noout -subject -nameopt multiline | awk -F' = ' '/organizationalUnitName/{print $2}'
+    done | grep -vx "$TEAM" | sort -u)
+  fi
+  TEAM="${WALD_IOS_PERSONAL_TEAM:-}"
+  if [ -z "$TEAM" ]; then
+    n=$(grep -c . <<< "$PTEAMS")
+    [ "$n" -eq 1 ] || die "개인(무료) 팀이 하나가 아니다($n) — Xcode > 설정 > Apple Accounts 에 개인 Apple ID 를 넣고 Manage Certificates… > + > Apple Development, 또는 WALD_IOS_PERSONAL_TEAM"
+    TEAM=$PTEAMS
+  fi
+  DJ="$LOG/ios-devices.json"
+  xcrun devicectl list devices --json-output "$DJ" >/dev/null 2>&1 || die "devicectl list devices"
+  DINFO=$(python3 -I - "$DJ" "${WALD_IOS_DEVICE:-}" <<'PY'
+import json, sys
+want = sys.argv[2].upper()
+devs = [x for x in json.load(open(sys.argv[1]))["result"]["devices"]
+        if x.get("hardwareProperties", {}).get("reality") != "simulated" and x.get("hardwareProperties", {}).get("platform") == "iOS"]
+if want:
+    devs = [x for x in devs if x["hardwareProperties"].get("udid", "").upper() == want]
+if len(devs) != 1:
+    print(f"연결된 iPhone 이 하나가 아니다({len(devs)}) — 하나만 연결하거나 WALD_IOS_DEVICE=<UDID>", file=sys.stderr); sys.exit(1)
+x = devs[0]
+print(x["hardwareProperties"]["udid"]); print(x["deviceProperties"].get("developerModeStatus") or "unknown"); print(x["deviceProperties"].get("name"))
+PY
+  ) || die "설치할 iPhone 찾기(위 메시지)"
+  DEV_UDID=${${(f)DINFO}[1]}; DEV_MODE=${${(f)DINFO}[2]}; DEV_NAME=${${(f)DINFO}[3]}
+  [ "$DEV_MODE" != disabled ] || die "iPhone 개발자 모드가 꺼져 있다 — 설정 > 개인정보 보호 및 보안 > 개발자 모드"
+  echo "personal team ${TEAM[1,3]}… / device $DEV_NAME (${DEV_UDID[1,8]}…, developer mode $DEV_MODE) / bundle $APP_BUNDLE"
+elif [ "$MODE" = device ]; then
   step "signing"
-  security find-identity -v -p codesigning | grep -qF "\"$SIGN_ID\"" || die "keychain 에 '$SIGN_ID' 가 없다(ios-adhoc-signing.py --apply)"
-  [ -f "$PROFILE_SRC" ] || die "Ad Hoc 프로필이 없다: $PROFILE_SRC(ios-adhoc-signing.py --apply)"
+  GEN_ARG=""; [ "$SIGNING" = development ] && GEN_ARG=" --development"
+  IDS=$(security find-identity -v -p codesigning | grep -F "\"$SIGN_KIND: ")
+  [ -n "$IDS" ] || die "keychain 에 '$SIGN_KIND' 서명 ID 가 없다(ios-adhoc-signing.py$GEN_ARG --apply)"
+  [ -z "$SIGN_ID" ] || grep -qF "\"$SIGN_ID\"" <<< "$IDS" || die "keychain 에 '$SIGN_ID' 가 없다(ios-adhoc-signing.py --apply)"
+  [ -f "$PROFILE_SRC" ] || die "$P_KIND 프로필이 없다: $PROFILE_SRC(ios-adhoc-signing.py$GEN_ARG --apply)"
   PLIST="$LOG/ios-profile.plist"
   security cms -D -i "$PROFILE_SRC" > "$PLIST" 2>/dev/null || die "프로필을 풀지 못했다"
-  # 이름·UUID·만료(UTC)·기기 수를 한 줄씩. Ad Hoc(기기 목록 있음, 전체 기기 아님)·팀·App ID·만료(하루 넘게 남음)·
-  # 프로필 안 인증서가 keychain 의 배포 인증서(SHA-1)인지 함께 본다.
-  ID_SHA1=$(security find-identity -v -p codesigning | grep -F "\"$SIGN_ID\"" | awk '{print $2}')
-  PINFO=$(python3 -I - "$PLIST" "$TEAM" "$ID_SHA1" <<'PY'
+  # 이름·UUID·만료(UTC)·기기 수·서명 인증서 SHA-1 을 한 줄씩. 종류(get-task-allow — Ad Hoc false·Development true, 전체 기기 아님)·
+  # 기기 목록·팀·App ID·만료(하루 넘게 남음)·프로필 안 인증서가 keychain 의 '$SIGN_KIND' 인증서(SHA-1)인지 함께 본다.
+  ID_SHA1=$(awk '{print $2}' <<< "$IDS"); [ -z "$SIGN_ID" ] || ID_SHA1=$(grep -F "\"$SIGN_ID\"" <<< "$IDS" | awk '{print $2}')
+  PINFO=$(python3 -I - "$PLIST" "$TEAM" "$ID_SHA1" "$WANT_GTA" <<'PY'
 import datetime, hashlib, plistlib, sys
 d = plistlib.load(open(sys.argv[1], "rb"))
-team, ids = sys.argv[2], set(sys.argv[3].upper().split())
+team, ids, gta = sys.argv[2], set(sys.argv[3].upper().split()), sys.argv[4] == "true"
 def fail(m): print(m, file=sys.stderr); sys.exit(1)
-if d.get("ProvisionsAllDevices"): fail("프로필이 Ad Hoc 가 아니다(ProvisionsAllDevices)")
+if d.get("ProvisionsAllDevices"): fail("프로필이 전체 기기(Enterprise)용이다(ProvisionsAllDevices)")
+if bool(d["Entitlements"].get("get-task-allow")) != gta: fail(f"프로필 종류가 다르다(get-task-allow {not gta})")
 devs = d.get("ProvisionedDevices") or []
 if not devs: fail("프로필에 등록 기기가 없다")
 if d.get("TeamIdentifier", [None])[0] != team or d["Entitlements"].get("application-identifier") != f"{team}.co.kr.waldlust.remote":
     fail("프로필 팀·App ID 가 다르다")
 exp = d["ExpirationDate"].replace(tzinfo=datetime.timezone.utc)
 if exp < datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1): fail(f"프로필이 곧 만료되거나 만료됐다({exp:%Y-%m-%d})")
-if not ids & {hashlib.sha1(c).hexdigest().upper() for c in d.get("DeveloperCertificates", [])}:
-    fail("프로필의 인증서가 keychain 의 배포 인증서와 다르다")
-print(d["Name"]); print(d["UUID"]); print(f"{exp:%Y-%m-%d}"); print(len(devs))
+hit = sorted(ids & {hashlib.sha1(c).hexdigest().upper() for c in d.get("DeveloperCertificates", [])})
+if not hit: fail("프로필의 인증서가 keychain 의 서명 인증서와 다르다")
+print(d["Name"]); print(d["UUID"]); print(f"{exp:%Y-%m-%d}"); print(len(devs)); print(hit[0])
 PY
   ) || die "프로필 확인 실패(위 메시지)"
-  P_NAME=${${(f)PINFO}[1]}; P_UUID=${${(f)PINFO}[2]}; P_EXP=${${(f)PINFO}[3]}; P_DEVICES=${${(f)PINFO}[4]}
+  P_NAME=${${(f)PINFO}[1]}; P_UUID=${${(f)PINFO}[2]}; P_EXP=${${(f)PINFO}[3]}; P_DEVICES=${${(f)PINFO}[4]}; P_SHA1=${${(f)PINFO}[5]}
+  SIGN_ID=$(grep -F " $P_SHA1 " <<< "$IDS" | head -1 | sed -E 's/^[^"]*"(.*)"$/\1/')
+  [ -n "$SIGN_ID" ] || die "프로필 인증서(${P_SHA1[1,8]}…)의 서명 ID 이름을 못 찾았다"
   for pd in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
     mkdir -p "$pd" && cp "$PROFILE_SRC" "$pd/$P_UUID.mobileprovision" || die "프로필 설치"
   done
-  echo "profile: $P_NAME ($P_UUID) devices $P_DEVICES, expires $P_EXP"
+  echo "profile: $P_NAME ($P_UUID) $P_KIND, devices $P_DEVICES, expires $P_EXP / signer $SIGN_ID"
 fi
 
-# 5) Flutter. 시뮬레이터는 debug 만 된다(Rust 라이브러리가 arm64 뿐이라 arm64 만). 기기는 release + Ad Hoc 내보내기.
+# 5) Flutter. 시뮬레이터는 debug 만 된다(Rust 라이브러리가 arm64 뿐이라 arm64 만). 기기는 release + Ad Hoc·Development 내보내기.
 if [ "$MODE" = simulator ]; then
   step flutter
   ( cd flutter && FLUTTER_XCODE_ARCHS=arm64 flutter build ios --simulator --debug ) > "$LOG/ios-flutter.log" 2>&1 || die flutter
   APP="flutter/build/ios/iphonesimulator/Runner.app"
   [ -d "$APP" ] || die "앱 번들이 없다: $APP"
+elif [ "$SIGNING" = personal ]; then
+  step "flutter config + xcodebuild (personal team, build $BUILD_NO)"
+  # 이 worktree 의 Runner 타깃 세 구성만 팀·번들 ID 를 바꾸고 엔타이틀먼트를 비운다(자동 서명 그대로). Flutter 는 프로젝트에
+  # DEVELOPMENT_TEAM 이 있으면 -allowProvisioningUpdates 를 붙이지 않아 xcodebuild 를 직접 부른다(--config-only 가 pod 까지 한다).
+  python3 -I - flutter/ios/Runner.xcodeproj/project.pbxproj "$TEAM" "$APP_BUNDLE" <<'PY' || die "Runner 타깃에 개인 팀 넣기"
+import sys
+p, team, bid = sys.argv[1:4]
+s = open(p, encoding="utf-8").read()
+for a, b in (("DEVELOPMENT_TEAM = GFY79GHBW8;", f"DEVELOPMENT_TEAM = {team};"),
+             ("PRODUCT_BUNDLE_IDENTIFIER = co.kr.waldlust.remote;", f"PRODUCT_BUNDLE_IDENTIFIER = {bid};")):
+    assert s.count(a) == 3, f"Runner 타깃 구성이 3개가 아니다({a})"
+    s = s.replace(a, b)
+open(p, "w", encoding="utf-8").write(s)
+PY
+  cat > flutter/ios/Runner/Runner.entitlements <<'ENT'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict/>
+</plist>
+ENT
+  ( cd flutter && flutter build ios --config-only --release --build-number="$BUILD_NO" ) > "$LOG/ios-flutter-config.log" 2>&1 || die "flutter config-only"
+  DD="$W/flutter/build/ios-personal"
+  ( cd flutter/ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -destination "id=$DEV_UDID" \
+      -derivedDataPath "$DD" -allowProvisioningUpdates -allowProvisioningDeviceRegistration build ) > "$LOG/ios-xcodebuild-personal.log" 2>&1 ||
+    die "xcodebuild(개인 팀) — ios-xcodebuild-personal.log 끝의 error(계정·기기 등록·개발자 모드)"
+  APP="$DD/Build/Products/Release-iphoneos/Runner.app"
+  [ -d "$APP" ] || die "앱 번들이 없다: $APP"
 else
   step "flutter ipa (build $BUILD_NO)"
   # 수동 서명은 이 worktree 의 Runner 타깃 설정(번들 ID 가 있는 세 구성)에만 넣는다 — 포크 프로젝트는 자동 서명 그대로.
-  python3 -I - flutter/ios/Runner.xcodeproj/project.pbxproj "$P_NAME" <<'PY' || die "Runner 타깃에 수동 서명 넣기"
+  python3 -I - flutter/ios/Runner.xcodeproj/project.pbxproj "$P_NAME" "$SIGN_KIND" <<'PY' || die "Runner 타깃에 수동 서명 넣기"
 import re, sys
-p, name = sys.argv[1], sys.argv[2]
+p, name, kind = sys.argv[1], sys.argv[2], sys.argv[3]
 s = open(p, encoding="utf-8").read()
 anchor = "CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;\n"
 n = s.count(anchor)
 assert n == 3, f"Runner 타깃 구성이 3개가 아니다({n})"
 def add(m):
     ind = m.group(1)
-    return (m.group(0) + f'{ind}CODE_SIGN_STYLE = Manual;\n{ind}"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";\n'
+    return (m.group(0) + f'{ind}CODE_SIGN_STYLE = Manual;\n{ind}"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "{kind}";\n'
             f'{ind}PROVISIONING_PROFILE_SPECIFIER = "{name}";\n')
 s = re.sub(r"([ \t]*)" + re.escape(anchor), add, s)
 open(p, "w", encoding="utf-8").write(s)
@@ -322,10 +421,10 @@ PY
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>method</key><string>release-testing</string>
+  <key>method</key><string>$EXPORT_METHOD</string>
   <key>teamID</key><string>$TEAM</string>
   <key>signingStyle</key><string>manual</string>
-  <key>signingCertificate</key><string>Apple Distribution</string>
+  <key>signingCertificate</key><string>$SIGN_KIND</string>
   <key>provisioningProfiles</key><dict><key>co.kr.waldlust.remote</key><string>$P_NAME</string></dict>
   <key>thinning</key><string>&lt;none&gt;</string>
   <key>stripSwiftSymbols</key><true/>
@@ -346,7 +445,7 @@ fi
 
 # 6) 확인: heartbeat 주소(기대값 1 이상, 운영 0 — prodtest·release 는 기대값이 곧 운영), API 서버를 넣었으면 그 값(1 이상), 번들 ID·스킴, 플랫폼·최소 OS.
 #    시뮬레이터 debug 빌드는 코드가 Runner.debug.dylib 로 갈 수 있어 앱 안 Mach-O 를 모두 본다.
-#    기기는 버전·빌드 번호, 서명(Apple Distribution·Ad Hoc 프로필·엔타이틀먼트)까지 본다.
+#    기기는 버전·빌드 번호, 서명(인증서·Ad Hoc 또는 Development 프로필·엔타이틀먼트)까지 본다.
 step verify
 HB_NEEDLE="${WALDLUST_HEARTBEAT_URL#*://}"
 API_URL="${WALDLUST_API_SERVER:-}"; API_URL="${API_URL%/}"; API_NEEDLE="${API_URL#*://}"
@@ -366,7 +465,7 @@ BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.pl
 SCHEMES=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes' "$APP/Info.plist" | tr -d ' {}\n' | sed 's/Array//')
 BUILD_INFO=$(xcrun vtool -show-build "$APP/Runner" | awk '$1=="platform"||$1=="minos"{printf "%s %s ", $1, $2}')
 echo "bundle id: $BUNDLE_ID / url scheme: $SCHEMES / $BUILD_INFO"
-[ "$BUNDLE_ID" = co.kr.waldlust.remote ] && [ "$SCHEMES" = waldlust ] || die "번들 ID·URL 스킴이 정식 값이 아니다"
+[ "$BUNDLE_ID" = "$APP_BUNDLE" ] && [ "$SCHEMES" = waldlust ] || die "번들 ID·URL 스킴이 기대값($APP_BUNDLE·waldlust)이 아니다"
 WANT_BUILD=IOSSIMULATOR; [ "$MODE" = device ] && WANT_BUILD="platform IOS "
 [[ "$BUILD_INFO" == *"$WANT_BUILD"* && "$BUILD_INFO" == *"minos $MIN_IOS"* ]] || die "플랫폼·최소 OS 가 기대값(${WANT_BUILD% }·$MIN_IOS)이 아니다"
 if [ "$MODE" = device ]; then
@@ -375,17 +474,36 @@ if [ "$MODE" = device ]; then
   [ "$B_VER" = "$VER" ] && [ "$B_NO" = "$BUILD_NO" ] || die "버전·빌드 번호가 $VER($BUILD_NO)가 아니다($B_VER/$B_NO)"
   codesign --verify --deep --strict "$APP" 2> "$LOG/ios-codesign-verify.log" || die "codesign 검증 실패"
   AUTH=$(codesign -dvv "$APP" 2>&1 | grep -m1 '^Authority=' | cut -d= -f2-)
-  [ "$AUTH" = "$SIGN_ID" ] || die "서명자가 '$SIGN_ID' 가 아니다($AUTH)"
+  if [ "$SIGNING" = personal ]; then
+    [[ "$AUTH" == "Apple Development: "* ]] || die "서명자가 Apple Development 가 아니다($AUTH)"
+  else
+    [ "$AUTH" = "$SIGN_ID" ] || die "서명자가 '$SIGN_ID' 가 아니다($AUTH)"
+  fi
   ENT="$LOG/ios-entitlements.plist"
   codesign -d --entitlements - --xml "$APP" > "$ENT" 2>/dev/null || die "엔타이틀먼트 읽기"
-  [ "$(pval "$ENT" get-task-allow)" = false ] || die "get-task-allow 가 false 가 아니다(배포 서명이 아님)"
-  [ "$(pval "$ENT" application-identifier)" = "$TEAM.co.kr.waldlust.remote" ] || die "application-identifier 가 다르다"
-  [ "$(pval "$ENT" aps-environment)" = production ] || die "aps-environment 가 production 이 아니다"
-  [ "$(pval "$ENT" com.apple.developer.networking.wifi-info)" = true ] || die "wifi-info 엔타이틀먼트가 없다"
+  [ "$(pval "$ENT" get-task-allow)" = "$WANT_GTA" ] || die "get-task-allow 가 $WANT_GTA 가 아니다($P_KIND 서명이 아님)"
+  [ "$(pval "$ENT" application-identifier)" = "$TEAM.$APP_BUNDLE" ] || die "application-identifier 가 다르다"
+  if [ "$SIGNING" != personal ]; then
+    [ "$(pval "$ENT" aps-environment)" = "$WANT_APS" ] || die "aps-environment 가 $WANT_APS 가 아니다"
+    [ "$(pval "$ENT" com.apple.developer.networking.wifi-info)" = true ] || die "wifi-info 엔타이틀먼트가 없다"
+  fi
   EMB="$LOG/ios-embedded-profile.plist"
   security cms -D -i "$APP/embedded.mobileprovision" > "$EMB" 2>/dev/null || die "앱 안 프로필을 풀지 못했다"
-  [ "$(pval "$EMB" UUID)" = "$P_UUID" ] || die "앱 안 프로필이 $P_NAME 이 아니다"
-  echo "signed: $AUTH / profile $P_NAME (Ad Hoc, devices $P_DEVICES, expires $P_EXP) / version $B_VER ($B_NO)"
+  if [ "$SIGNING" = personal ]; then
+    PINFO=$(python3 -I - "$EMB" "$DEV_UDID" <<'PY'
+import plistlib, sys
+d = plistlib.load(open(sys.argv[1], "rb"))
+devs = [u.upper() for u in d.get("ProvisionedDevices") or []]
+if sys.argv[2].upper() not in devs:
+    print("앱 안 프로필에 이 iPhone 이 없다", file=sys.stderr); sys.exit(1)
+print(d["Name"]); print(d["UUID"]); print(f"{d['ExpirationDate']:%Y-%m-%d}"); print(len(devs))
+PY
+    ) || die "앱 안 프로필 확인(위 메시지)"
+    P_NAME=${${(f)PINFO}[1]}; P_UUID=${${(f)PINFO}[2]}; P_EXP=${${(f)PINFO}[3]}; P_DEVICES=${${(f)PINFO}[4]}
+  else
+    [ "$(pval "$EMB" UUID)" = "$P_UUID" ] || die "앱 안 프로필이 $P_NAME 이 아니다"
+  fi
+  echo "signed: $AUTH / profile $P_NAME ($P_KIND, devices $P_DEVICES, expires $P_EXP) / version $B_VER ($B_NO)"
 fi
 
 # 7) dist/<버전>-<sha9>-<대상>/ 에 앱(.app 또는 .ipa)과 manifest 를 모은다.
@@ -396,6 +514,11 @@ mkdir -p "$DIST"
 if [ "$MODE" = simulator ]; then
   DEST="$DIST/waldlust-remote$SUFFIX-$VER-ios-simulator-$TARGET.app"
   MAN="$DIST/manifest-ios-simulator-$VARIANT.txt"
+  rm -rf "$DEST"
+  ditto "$APP" "$DEST" || die "앱 복사"
+elif [ "$SIGNING" = personal ]; then
+  DEST="$DIST/waldlust-remote$SUFFIX-$VER-ios-personal-$TARGET.app"
+  MAN="$DIST/manifest-ios-personal-$VARIANT.txt"
   rm -rf "$DEST"
   ditto "$APP" "$DEST" || die "앱 복사"
 else
@@ -423,11 +546,17 @@ fi
   else
     echo "version: $B_VER ($B_NO)"
     echo "cargo features: $FEATURES"
+    echo "signing: $SIGNING"
     echo "signer: $AUTH"
-    echo "profile: $P_NAME ($P_UUID) — Ad Hoc, devices $P_DEVICES, expires $P_EXP"
-    echo "ipa: ${DEST:t}"
-    echo "size: $(stat -f %z "$DEST")"
-    echo "sha256: $(shasum -a 256 "$DEST" | awk '{print $1}')"
+    echo "profile: $P_NAME ($P_UUID) — $P_KIND, devices $P_DEVICES, expires $P_EXP"
+    if [ "$SIGNING" = personal ]; then
+      echo "app: ${DEST:t} (personal team ${TEAM[1,3]}…, bundle $APP_BUNDLE — 시험 전용, 엔타이틀먼트 없음)"
+      echo "size: $(du -sk "$DEST" | awk '{print $1}') KiB"
+    else
+      echo "ipa: ${DEST:t}"
+      echo "size: $(stat -f %z "$DEST")"
+      echo "sha256: $(shasum -a 256 "$DEST" | awk '{print $1}')"
+    fi
   fi
   echo "built: $(date '+%Y-%m-%d %H:%M:%S')"
 } > "$MAN"
@@ -443,6 +572,9 @@ echo "done: $DEST"
 if [ "$MODE" = simulator ]; then
   echo "실행: xcrun simctl install booted \"$DEST\" && xcrun simctl launch booted co.kr.waldlust.remote"
   [ "$TARGET" = mock ] && echo "목업 대상이다 — 앱을 띄우기 전에 rd-mock(8787)을 띄운다"
+elif [ "$SIGNING" = personal ]; then
+  echo "설치: xcrun devicectl device install app --device $DEV_UDID \"$DEST\""
+  echo "      첫 실행 전 iPhone 설정 > 일반 > VPN 및 기기 관리 > 개발자 앱 신뢰. 프로필 만료 $P_EXP(7일) — 지나면 다시 빌드·설치"
 else
   echo "설치: 프로필에 등록한 iPhone 을 Mac 에 연결 → Finder 에서 기기를 고르고 .ipa 를 끌어 놓는다(또는 Apple Configurator)"
 fi
