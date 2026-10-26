@@ -358,22 +358,10 @@ void _showError(String code, String detail, String page) {
   });
 }
 
-/// 수신 전용 ⓘ 정보 대화상자의 버튼: 새 버전이 있으면 [닫기][업데이트], 없으면 [닫기].
-List<Widget> waldUpdateInfoActions(VoidCallback close) {
-  bool available() =>
-      _str(stateGlobal.waldUpdateState.value, 'status') == 'available';
-  return [
-    Obx(() => dialogButton('Close', onPressed: close, isOutline: available())),
-    Obx(() => available()
-        ? dialogButton('Update', onPressed: showWaldUpdateDialog)
-        : const SizedBox.shrink()),
-  ];
-}
-
 /// 설정 > 정보의 '최신 버전' 줄 — 처음 그릴 때 확인한다(1분 안에 확인했으면 그 결과를 쓴다).
 class WaldUpdateAboutRow extends StatefulWidget {
   /// 수신 전용 ⓘ 정보 대화상자(결정 D44 — 좁은 창): 열 때마다 확인하고 버전·빌드 날짜 줄과 같은 모양으로
-  /// 최신 버전만 보인다. [업데이트]는 대화상자 버튼(waldUpdateInfoActions)이다.
+  /// 최신 버전을 보이고, 새 버전이 있으면 같은 줄 오른쪽에 [업데이트]를 둔다.
   final bool compact;
   const WaldUpdateAboutRow({super.key, this.compact = false});
 
@@ -436,6 +424,8 @@ class _WaldUpdateAboutRowState extends State<WaldUpdateAboutRow> {
                   style: status == 'available'
                       ? const TextStyle(fontWeight: FontWeight.w600)
                       : null)),
+          if (status == 'available')
+            dialogButton('Update', onPressed: showWaldUpdateDialog),
         ]).marginSymmetric(vertical: 4);
       }
       return Column(

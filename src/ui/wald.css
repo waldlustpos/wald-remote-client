@@ -429,7 +429,16 @@ div.wald-dialog-actions {
     text-align: right;
 }
 
-/* 앱 안 업데이트(명세 DSK-01 — 결정 D44): 진행·오류 대화상자, 정보 대화상자의 [닫기][업데이트] 간격 */
+/* 앱 안 업데이트(명세 DSK-01 — 결정 D44): 진행·오류 대화상자, 정보 대화상자의 '최신 버전' 줄([업데이트]가 오른쪽에 붙는다) */
+div.wald-update-row > div {
+    margin-top: *;
+    margin-bottom: *;
+}
+
+div.wald-update-row > button {
+    margin-left: 8px;
+}
+
 div.wald-update-text {
     margin: 4px 0;
     line-height: 20px;

@@ -129,7 +129,7 @@ function waldAbout() {
                 {"Modifications \u00A9 2026 Waldlust Co., Ltd."}<br />
                 {"Licensed under the GNU AGPL-3.0, without any warranty."}
             </div>
-            <div .wald-dialog-actions>{waldUpdateAboutActions()}</div>
+            <div .wald-dialog-actions><button .wald-btn-primary #wald-about-close>{translate('Close')}</button></div>
         </div>
     </div>;
 }
@@ -255,24 +255,18 @@ function waldUpdateDialog() {
     </div>;
 }
 
-// 정보(i) 대화상자의 '최신 버전' 줄 — 버전·빌드 날짜 줄과 같은 모양. [업데이트]는 대화상자 버튼(waldUpdateAboutActions).
+// 정보(i) 대화상자의 '최신 버전' 줄 — 버전·빌드 날짜 줄과 같은 모양, 새 버전이 있으면 같은 줄 오른쪽에 [업데이트].
 function waldUpdateAboutRow() {
     var status = wald_update.status;
     var latest = wald_update.latest || {};
     var value = status == "checking" ? translate('wald-update-checking')
         : status == "error" ? translate('wald-update-check-failed')
         : (latest.version || "-");
-    return <div .wald-info-row>
+    return <div .wald-info-row .wald-update-row>
         <div .wald-info-label>{translate('wald-update-latest-label')}</div>
         <div .wald-info-value style={status == "available" ? "font-weight:bold" : ""}>{value}</div>
+        {status == "available" ? <button .wald-btn-primary #wald-update>{translate('Update')}</button> : ""}
     </div>;
-}
-
-// 정보(i) 대화상자의 버튼: 새 버전이 있으면 [닫기][업데이트], 없으면 [닫기].
-function waldUpdateAboutActions() {
-    if (wald_update.status != "available") return <button .wald-btn-primary #wald-about-close>{translate('Close')}</button>;
-    return [<button .wald-btn-outline #wald-about-close>{translate('Close')}</button>,
-        <button .wald-btn-primary #wald-update>{translate('Update')}</button>];
 }
 
 // 정보(i)를 열 때마다 확인한다(Flutter WaldUpdateAboutRow compact 와 같다). 결과는 2초 폴링으로 들어온다.
