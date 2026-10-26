@@ -19,9 +19,10 @@ import 'package:url_launcher/url_launcher_string.dart';
 // 같은 진행·오류 창을 쓴다. 로그인하지 않는다(받기 키). 홈 카드는 없고(2026-10-26 사용자) ⓘ 정보 대화상자가 열 때 확인해
 // 최신 버전을 보이고 [업데이트]로 확인 창 없이 바로 받는다. Windows 수신 전용 창은 폭 280 이라 대화상자 바깥 여백을 줄인다.
 
+/// 새 버전을 확인하는 앱. 직원 모바일(Android 발신 전용 — 결정 D43)은 확인만 한다(WaldUpdateMobileTile).
 bool get waldUpdateSupported =>
     ((isWindows || isMacOS) && !bind.isOutgoingOnly()) ||
-    (isAndroid && bind.isIncomingOnly());
+    (isAndroid && (bind.isIncomingOnly() || bind.isOutgoingOnly()));
 
 /// Windows 수신 전용 홈은 폭 280 창이다(부록 A-39) — 대화상자 바깥 여백을 줄인다(wald_app_info.dart 와 같다).
 EdgeInsets? get _insetPadding => isDesktop && bind.isIncomingOnly()
@@ -369,18 +370,23 @@ class WaldUpdateAboutRow extends StatefulWidget {
   State<WaldUpdateAboutRow> createState() => _WaldUpdateAboutRowState();
 }
 
+/// 최신 버전 줄을 처음 그릴 때: 지금 상태를 읽고, 1분 안에 확인하지 않았으면(always 면 늘) 확인한다.
+void _checkOnOpen({bool always = false}) {
+  final s = _readState();
+  if (s.isNotEmpty) stateGlobal.waldUpdateState.value = s;
+  final checkedAt = s['checkedAt'] is int ? s['checkedAt'] as int : 0;
+  if (s['status'] != 'checking' &&
+      (always ||
+          DateTime.now().millisecondsSinceEpoch - checkedAt > 60 * 1000)) {
+    waldUpdateCheckNow();
+  }
+}
+
 class _WaldUpdateAboutRowState extends State<WaldUpdateAboutRow> {
   @override
   void initState() {
     super.initState();
-    final s = _readState();
-    if (s.isNotEmpty) stateGlobal.waldUpdateState.value = s;
-    final checkedAt = s['checkedAt'] is int ? s['checkedAt'] as int : 0;
-    if (s['status'] != 'checking' &&
-        (widget.compact ||
-            DateTime.now().millisecondsSinceEpoch - checkedAt > 60 * 1000)) {
-      waldUpdateCheckNow();
-    }
+    _checkOnOpen(always: widget.compact);
   }
 
   @override
@@ -457,6 +463,56 @@ class _WaldUpdateAboutRowState extends State<WaldUpdateAboutRow> {
               ).marginOnly(left: 12),
           ]).marginSymmetric(vertical: 4.0),
         ],
+      );
+    });
+  }
+}
+
+/// 직원 모바일(Android 발신 전용 — 결정 D43, 2026-10-26 사용자): 설정 '정보'의 최신 버전 줄. 홈 카드는 없다.
+/// 앱 안 설치는 없고(설치 권한을 뺐다), 새 버전이면 [다운로드]가 브라우저로 어드민 '원격 설치 파일'(latest page)을 연다.
+class WaldUpdateMobileTile extends StatefulWidget {
+  const WaldUpdateMobileTile({super.key});
+
+  @override
+  State<WaldUpdateMobileTile> createState() => _WaldUpdateMobileTileState();
+}
+
+class _WaldUpdateMobileTileState extends State<WaldUpdateMobileTile> {
+  @override
+  void initState() {
+    super.initState();
+    _checkOnOpen();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final s = stateGlobal.waldUpdateState.value;
+      final status = _str(s, 'status');
+      final latest = _latest(s);
+      final version = _str(latest, 'version');
+      final page = _str(latest, 'page');
+      final String value;
+      switch (status) {
+        case 'checking':
+          value = translate('wald-update-checking');
+          break;
+        case 'error':
+          value = translate('wald-update-check-failed');
+          break;
+        default:
+          value = version.isEmpty ? '-' : version;
+      }
+      return ListTile(
+        leading: Icon(waldIcon(Icons.download)),
+        title: Text(translate('wald-update-latest-label')),
+        subtitle: Text(value,
+            style: status == 'available'
+                ? const TextStyle(fontWeight: FontWeight.w600)
+                : null),
+        trailing: status == 'available' && page.isNotEmpty
+            ? dialogButton('Download', onPressed: () => launchUrlString(page))
+            : null,
       );
     });
   }

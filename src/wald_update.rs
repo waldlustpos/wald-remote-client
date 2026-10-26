@@ -104,10 +104,12 @@ fn work_dir() -> PathBuf {
     dir.unwrap_or_else(|| std::env::temp_dir().join("waldlust-update"))
 }
 
-/// 앱 안 업데이트를 하는 빌드: 데스크탑 양방향(D42)·현장 수신 전용 Windows·Android(D44). 발신 전용(폰)·Android 양방향은 아니다.
+/// 새 버전을 확인하는 빌드: 데스크탑 양방향(D42)·현장 수신 전용 Windows·Android(D44)는 앱 안에서 받아 설치하고,
+/// 직원 모바일(Android 발신 전용 — 결정 D43)은 확인만 한다(설정 화면의 최신 버전 줄 → 브라우저로 어드민 page).
+/// 데스크탑 발신 전용·Android 양방향은 아니다.
 fn supported() -> bool {
     if cfg!(target_os = "android") {
-        crate::wald_variant::is_incoming()
+        crate::wald_variant::is_incoming() || crate::wald_variant::is_outgoing()
     } else {
         !crate::wald_variant::is_outgoing()
     }
