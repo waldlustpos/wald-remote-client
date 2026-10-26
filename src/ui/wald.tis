@@ -155,26 +155,9 @@ function waldLegal() {
     </div>;
 }
 
-// 설치 안 됨 → 어두운 설치 카드, 낮은 버전 → 업그레이드 카드, 그 밖 → 오른쪽 '종료' 버튼(Flutter buildHelpCards).
+// 수신 전용은 카드를 쓰지 않는다(2026-10-26 사용자 — 설치·낮은 버전·오류 카드 모두) — 오른쪽 '종료' 버튼만(Flutter buildHelpCards).
+// 새 버전·업데이트는 정보(i)에서 한다.
 function waldHelpCard() {
-    if (system_error) {
-        return <div .wald-card><div .wald-card-text>{system_error}</div></div>;
-    }
-    if (is_win && !disable_installation) {
-        if (!handler.is_installed()) {
-            return <div .wald-card>
-                <div .wald-card-text>{translate('install_tip')}</div>
-                <div .wald-card-btns><button .wald-card-btn #wald-install>{translate('Install')}</button></div>
-            </div>;
-        }
-        if (handler.is_installed_lower_version()) {
-            return <div .wald-card>
-                <div .wald-card-title>{translate('Status')}</div>
-                <div .wald-card-text>{translate('Your installation is lower version.')}</div>
-                <div .wald-card-btns><button .wald-card-btn #wald-upgrade>{translate('Click to upgrade')}</button></div>
-            </div>;
-        }
-    }
     return <div .wald-quit-row><button .wald-btn-outline #wald-quit>{translate('Quit')}</button></div>;
 }
 
@@ -377,14 +360,6 @@ event dblclick $(div.wald-id-value) {
     if (!key_confirmed) return;
     view.clipboard(#put, get_id());
     waldToast(translate("Copied"));
-}
-
-event click $(#wald-install) {
-    handler.goto_install();
-}
-
-event click $(#wald-upgrade) {
-    handler.update_me("");
 }
 
 event click $(#wald-quit) {
