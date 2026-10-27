@@ -63,6 +63,14 @@ class FloatingWindowService : Service(), View.OnTouchListener {
         return null
     }
 
+    // Waldlust(DSK-11): 자동 재시작하지 않는다(MainService 와 같다). 앱 프로세스가 죽으면(예: 도우미 설치 때 '출처를 알 수 없는 앱
+    // 설치' 허용 — REQUEST_INSTALL_PACKAGES changed) 시스템이 이 서비스만 새 프로세스로 되살리는데, 그때는 Rust 초기화(공통 프리셋 —
+    // 투명·터치 통과) 전이라 옵션을 빈 값으로 읽어 불투명 버블이 그 프로세스 내내 남는다.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        return START_NOT_STICKY
+    }
+
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
