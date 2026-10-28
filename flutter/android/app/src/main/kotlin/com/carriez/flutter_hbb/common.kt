@@ -189,6 +189,11 @@ fun setCodecInfo(context: Context) {
         if (hw != true) {
             return@forEach
         }
+        // Rockchip OMX HEVC 인코더(RK3568 Android 11)는 VPS/SPS/PPS 를 내지 않아 FFmpeg 크롭 BSF 가
+        // 매 프레임 거부하고, 실패하면 H.264 까지 꺼져 소프트웨어·반 해상도가 된다. 빼서 H.264 하드웨어로 가게 한다.
+        if (codec.isEncoder && codec.name.equals("OMX.rk.video_encoder.hevc", true)) {
+            return@forEach
+        }
         codecObject.put("hw", hw)
         var mime_type = ""
         codec.supportedTypes.forEach { type ->
