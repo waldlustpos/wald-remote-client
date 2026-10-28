@@ -233,6 +233,7 @@ class MainService : Service() {
             }
             "stop_capture" -> {
                 Log.d(logTag, "from rust:stop_capture")
+                waldCapturePending = false
                 stopCapture()
                 // Waldlust(DSK-02 — 부록 A-52): 화면 공유 연결이 모두 끝났다(Rust remove_connection) — 서비스 알림 문구를 되돌린다.
                 updateForegroundNotification(null, null, false)
@@ -422,6 +423,11 @@ class MainService : Service() {
                 waldPrepareProjection() // Waldlust(DSK-02): Android 14 재동의 창 막기·중지 감지
                 checkMediaPermission()
                 _isReady = true
+                // Waldlust(DSK-02): 토큰 없이 들어온 접속이 동의를 기다리고 있다 — 그 접속의 캡처를 이어서 시작한다.
+                if (waldCapturePending) {
+                    waldCapturePending = false
+                    startCapture()
+                }
             } ?: let {
                 Log.d(logTag, "getParcelableExtra intent null, invoke requestMediaProjection")
                 requestMediaProjection()
@@ -436,6 +442,9 @@ class MainService : Service() {
     }
 
     private var lastProjectionRequestMs = 0L
+    // Waldlust(DSK-02): 다른 앱(AnyDesk 등)이 화면 공유를 가져가 토큰이 없을 때 접속이 오면, 동의를 다시 받은 뒤 캡처를 시작해야 한다.
+    // 이게 없으면 동의를 받아도 그 접속은 '화면 기다리는 중'에 멈춘다.
+    @Volatile private var waldCapturePending = false
 
     private fun requestMediaProjection() {
         // 재요청 폭주 방지: 12초 내 재호출은 무시(연결마다 startCapture 가 여러 번 불릴 수 있음).
@@ -513,6 +522,7 @@ class MainService : Service() {
             // 팝업이 자동 승인되고, 아니면 최소한 기기 화면에 팝업이 떠서 수동 승인이 가능해진다.
             // (이게 없으면 '알림도 안 뜨고 화면만 검은' 상태가 된다.)
             Log.w(logTag, "startCapture: mediaProjection null → 화면공유 권한 재요청")
+            waldCapturePending = true
             requestMediaProjection()
             return false
         }
@@ -583,6 +593,7 @@ class MainService : Service() {
         Log.d(logTag, "destroy service")
         _isReady = false
         _isAudioStart = false
+        waldCapturePending = false
 
         stopCapture()
 
