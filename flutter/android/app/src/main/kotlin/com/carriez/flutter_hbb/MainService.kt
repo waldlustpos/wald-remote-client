@@ -654,6 +654,7 @@ class MainService : Service() {
     // 시스템이 화면 공유를 멈추면 상태를 비워 다음 접속 때 다시 요청(자동 승인)하게 한다 — 그대로 두면 끊긴 토큰으로 계속 기다린다.
     private fun waldPrepareProjection() {
         val mp = mediaProjection ?: return
+        waldProjectionStartMs = SystemClock.elapsedRealtime()
         mp.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
                 waldOnProjectionStopped(mp)
@@ -675,8 +676,16 @@ class MainService : Service() {
         }
     }
 
+    // Waldlust(DSK-02): Android 11 은 한 앱의 화면 공유가 멈추면 등록된 모든 화면 공유에 onStop 을 보낸다. 우리 새 토큰이 앞 앱(AnyDesk)의
+    // 화면 공유를 멈추게 하면 그 알림이 우리에게도 와(RK3568 — 24ms 뒤, 시스템은 여전히 우리 것으로 봄) 받은 토큰을 버렸다. 받은 직후의 onStop 은 무시한다.
+    private var waldProjectionStartMs = 0L
+
     private fun waldOnProjectionStopped(mp: MediaProjection) {
         if (mediaProjection !== mp) return
+        if (SystemClock.elapsedRealtime() - waldProjectionStartMs < 3_000L) {
+            Log.w(logTag, "media projection stop ignored — right after our start (another app's projection was stopped)")
+            return
+        }
         Log.w(logTag, "media projection stopped by system")
         if (_isStart) stopCapture()
         virtualDisplay?.release()
