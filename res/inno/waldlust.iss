@@ -20,7 +20,7 @@
 ; AppId·설치 경로·서비스 이름은 두 변형이 같아서, 한쪽 설치 위에 다른 쪽을 덮어 설치하면 ID 가 유지된다.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.7"
+  #define MyAppVersion "1.5.8"
 #endif
 #ifndef MyBuildDir
   #define MyBuildDir "rustdesk"
