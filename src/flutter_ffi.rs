@@ -3126,6 +3126,14 @@ pub mod server_side {
         crate::server::video_service::refresh()
     }
 
+    // Waldlust(DSK-02): MainService 가 접속 중에 다른 앱에 화면 공유를 빼앗겼다.
+    #[no_mangle]
+    pub unsafe extern "system" fn Java_ffi_FFI_waldOnProjectionTaken(_env: JNIEnv, _class: JClass) {
+        crate::ui_cm_interface::wald_close_screen_connections(
+            "Closed manually: another app on the remote device took over screen sharing. Connect again to take it back.",
+        );
+    }
+
     #[no_mangle]
     pub unsafe extern "system" fn Java_ffi_FFI_getLocalOption(
         env: JNIEnv,

@@ -687,7 +687,11 @@ class MainService : Service() {
             return
         }
         Log.w(logTag, "media projection stopped by system")
-        if (_isStart) stopCapture()
+        // Waldlust(DSK-02): 접속 중에 빼앗겼다 — 제어측에 알리고 화면 접속을 닫는다(멈춘 화면으로 두지 않는다. 다시 접속하면 가져온다).
+        if (_isStart) {
+            stopCapture()
+            FFI.waldOnProjectionTaken()
+        }
         virtualDisplay?.release()
         virtualDisplay = null
         mediaProjection = null

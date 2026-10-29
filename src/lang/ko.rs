@@ -699,6 +699,8 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("wald-helper-missing-tip", "설치되지 않음 — 앱을 강제 종료한 채 재부팅하면 원격이 꺼진 채 남습니다."),
         ("wald-helper-update-tip", "이 앱에 더 새 도우미가 들어 있습니다. 업데이트합니다."),
         ("wald-helper-no-bundle-tip", "이 빌드에는 도우미 설치 파일이 없습니다. 어드민 '원격 설치 파일'에서 받아 설치합니다."),
+        // Waldlust(DSK-02): 피제어 Android 에서 다른 앱이 화면 공유를 가져가 닫았을 때 제어측 안내(src/flutter_ffi.rs). 키에 "manually" 가 있어야 자동 재접속하지 않는다.
+        ("Closed manually: another app on the remote device took over screen sharing. Connect again to take it back.", "원격 기기의 다른 앱(다른 원격 프로그램 등)이 화면 공유를 가져가 연결을 닫았습니다. 다시 접속하면 화면을 가져옵니다."),
         ("wald-helper-install", "도우미 설치"),
         ("wald-helper-update", "도우미 업데이트"),
         ("wald-helper-later", "나중에"),

@@ -377,6 +377,22 @@ pub fn close(id: i32) {
     };
 }
 
+// Waldlust(DSK-02): Android 에서 다른 앱(AnyDesk 등)이 화면 공유를 가져갔다 — 화면 접속에 이유를 알리고 닫는다(사용자 결정 — 나중 접속이
+// 가져감, 멈춘 화면으로 두지 않는다). 제어측은 이유 문구에 "manually" 가 있으면 자동 재접속하지 않는다(client::check_if_retry).
+#[cfg(target_os = "android")]
+pub fn wald_close_screen_connections(reason: &str) {
+    let mut misc = Misc::new();
+    misc.set_close_reason(reason.to_owned());
+    let mut msg = Message::new();
+    msg.set_misc(misc);
+    for client in CLIENTS.read().unwrap().values() {
+        if client.authorized && !client.is_file_transfer && !client.is_terminal {
+            send_raw(msg.clone(), &client.tx);
+            allow_err!(client.tx.send(Data::Close));
+        }
+    }
+}
+
 #[inline]
 pub fn remove(id: i32) {
     CLIENTS.write().unwrap().remove(&id);

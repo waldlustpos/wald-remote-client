@@ -26,6 +26,7 @@ object FFI {
     external fun getLocalOption(key: String): String
     external fun getBuildinOption(key: String): String
     external fun getOption(key: String): String // Waldlust(DSK-02 — 부록 A-52)
+    external fun waldOnProjectionTaken() // Waldlust(DSK-02): 다른 앱이 화면 공유를 가져감 → 화면 접속 닫기
     external fun onClipboardUpdate(clips: ByteBuffer)
     external fun isServiceClipboardEnabled(): Boolean
 }
