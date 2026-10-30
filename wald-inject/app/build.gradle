@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// 원격 앱 서명 인증서 SHA-256(콜론 없는 16진수, 여러 개면 쉼표). 플러그인은 이 서명의 원격 앱(co.kr.waldlust.remote)만 받는다
+// (InjectService — 플랫폼 서명 앱이라 아무 앱이나 쓰면 기기 입력 전체를 조작할 수 있다). build-android-local 스크립트가 같이 만든
+// 원격 앱 APK 의 서명에서 계산해 넘긴다(시험 빌드 = debug 키, 정식 = 릴리즈 키). 비어 있으면 아무도 받지 않는다.
+def callerCerts = (project.findProperty('waldCallerCerts') ?: '').toString().toLowerCase().replaceAll('[^0-9a-f,]', '')
+
+android {
+    namespace 'co.kr.waldlust.remote.inject'
+    // 도우미와 같다(AGP 7.3.1 의 aapt2 가 android-35 이상을 읽지 못한다 — targetSdk 만 최신)
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'co.kr.waldlust.remote.inject'
+        minSdk 22
+        // 도우미와 같은 이유(targetSdk 33 이하는 Android 14 Play 프로텍트가 설치를 막는다)
+        targetSdk 36
+        // 빌드 스크립트가 원격 앱과 같은 버전을 넘긴다. 이 폴더에서 바로 빌드하면 dev.
+        versionCode((project.findProperty('waldVersionCode') ?: '1').toString().toInteger())
+        versionName((project.findProperty('waldVersionName') ?: 'dev').toString())
+        buildConfigField 'String', 'CALLER_CERTS', "\"${callerCerts}\""
+    }
+
+    buildTypes {
+        release {
+            // 서명하지 않는다(app-release-unsigned.apk) — 스크립트가 플랫폼 키로 apksigner 서명한다.
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    // 원격 앱 ↔ 플러그인 AIDL 의 정본은 원격 앱 쪽 한 곳이다(도우미와 같은 방식).
+    sourceSets {
+        main {
+            aidl.srcDirs += '../../flutter/android/app/src/main/aidl'
+        }
+    }
+}
+
+dependencies {
+    // 원격 앱과 같은 stdlib(flutter/android/app/build.gradle)
+    implementation("org.jetbrains.kotlin:kotlin-stdlib") { version { strictly("1.9.10") } }
+}

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- signature 권한이라 이 기기 플랫폼 키로 서명됐을 때만 허가된다(AnyDesk aosp2 와 같은 방식). 키가 다른 기기에도 설치는 되지만
+         허가되지 않아 canInject() 가 false 이고, 원격 앱도 플랫폼 서명이 맞지 않으면 쓰지 않는다. -->
+    <uses-permission
+        android:name="android.permission.INJECT_EVENTS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- 호출한 원격 앱의 서명을 확인하려면 그 패키지가 보여야 한다(Android 11+ 패키지 가시성) -->
+    <queries>
+        <package android:name="co.kr.waldlust.remote" />
+    </queries>
+
+    <!-- 런처 아이콘·화면은 없다(도우미와 같다). 설정 → 애플리케이션 목록에는 보인다. -->
+    <application
+        android:allowBackup="false"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="@string/app_name">
+
+        <!-- 원격 앱이 포인터 입력을 보내는 서비스. 서명 권한으로 막을 수 없어(원격 앱은 플랫폼 서명이 아니다) 트랜잭션마다
+             호출자가 고정한 서명의 원격 앱인지 확인한다(InjectService.isTrusted). -->
+        <service
+            android:name=".InjectService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="co.kr.waldlust.remote.inject.INJECT" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

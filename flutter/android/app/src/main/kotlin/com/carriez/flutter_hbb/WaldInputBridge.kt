@@ -97,6 +97,7 @@ object WaldInputBridge {
     fun ensureBound(context: Context) {
         val app = context.applicationContext
         appContext = app
+        WaldInjector.ensureBound(app) // 결정 D47 — 플랫폼 키 입력 플러그인(있을 때만)
         if (!receiverRegistered) {
             // 시스템 방송만 받는다(targetSdk 33 — 내보내기 플래그 불필요).
             val filter = IntentFilter().apply {

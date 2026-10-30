@@ -1,0 +1,11 @@
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+# 플랫폼 키는 저장소 밖(keys 폴더)에만 둔다 — 실수로 복사해도 올라가지 않게
+*.pk8
+*.x509.pem
+*.jks
+*.keystore

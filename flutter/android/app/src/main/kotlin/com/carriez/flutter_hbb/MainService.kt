@@ -78,6 +78,8 @@ class MainService : Service() {
             Log.d(logTag,"Turn on Screen")
             wakeLock.acquire(5000)
         } else {
+            // Waldlust(DSK-02 — 결정 D47): 플랫폼 키 입력 플러그인이 있으면 그쪽으로(터치 패널 없는 화면도 된다)
+            if (WaldInjector.pointer(kind, mask, x, y)) return
             // Waldlust(DSK-02 2단계): 도우미 입력 제어가 켜져 있으면 도우미로(강제 종료에도 남는 쪽)
             if (WaldInputBridge.pointer(kind, mask, x, y)) return
             when (kind) {

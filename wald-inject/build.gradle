@@ -1,0 +1,21 @@
+// Waldlust 원격지원 입력 플러그인(부록 A-69, 결정 D47): Flutter·cargo 없이 이 폴더에서 Gradle 로만 빌드한다.
+// 보드 플랫폼 키로 서명해야 INJECT_EVENTS 가 허가된다 — Gradle 은 서명하지 않은 release APK 를 만들고, build-android-local 스크립트가
+// apksigner 로 플랫폼 키(keys 폴더 — 저장소·CI 에 넣지 않는다)를 써서 서명한다(app/build.gradle).
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.1'
+        // 원격 앱·도우미와 같은 버전(flutter/android/settings.gradle)
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.21'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
