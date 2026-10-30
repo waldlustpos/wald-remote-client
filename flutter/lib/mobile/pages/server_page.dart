@@ -180,7 +180,7 @@ class _DropDownAction extends StatelessWidget {
   }
 }
 
-class _ServerPageState extends State<ServerPage> {
+class _ServerPageState extends State<ServerPage> with WidgetsBindingObserver {
   Timer? _updateTimer;
 
   @override
@@ -190,12 +190,22 @@ class _ServerPageState extends State<ServerPage> {
       await gFFI.serverModel.fetchID();
     });
     gFFI.serverModel.checkAndroidPermission();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _updateTimer?.cancel();
     super.dispose();
+  }
+
+  // Waldlust(DSK-02): 권한 설정 화면에서 허용하고 돌아오면 토글(파일 전송 등)을 다시 읽는다 — 안 읽으면 허용 뒤에도 OFF 로 남았다.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      gFFI.serverModel.checkAndroidPermission();
+    }
   }
 
   @override
