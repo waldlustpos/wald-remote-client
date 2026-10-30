@@ -12,6 +12,7 @@ import android.view.MotionEvent
 import android.view.ViewConfiguration
 import java.lang.reflect.Method
 import kotlin.math.max
+import kotlin.math.sign
 
 // 도우미 InputService.kt 와 같은 값(원격 앱이 Rust 에서 받은 그대로 넘긴다)
 const val LEFT_DOWN = 9
@@ -20,6 +21,9 @@ const val LEFT_UP = 10
 const val RIGHT_UP = 18
 const val WHEEL_DOWN = 523331
 const val WHEEL_UP = 963
+// 지금 제어측(Flutter — input_model.dart onPointerSignalImage)의 휠: MOUSE_TYPE_WHEEL(3), 버튼 없음, x·y = 방향(±1, 원격 앱이
+// scale 을 곱해 ±2 일 수 있다 — 부호만 쓴다). 위 두 값은 버튼 칸에 ±120 을 넣던 옛 형식이라 지금 제어측 휠은 도우미에서도 먹지 않는다.
+const val WHEEL = 3
 
 const val TOUCH_PAN_START = 4
 const val TOUCH_PAN_UPDATE = 5
@@ -98,8 +102,10 @@ class PointerInjector {
             }
             RIGHT_UP -> longPress()
             // 도우미의 휠은 120px 밀기(WHEEL_DOWN = 손가락을 위로 = 아래 내용) — 같은 방향의 휠 스크롤
-            WHEEL_DOWN -> scroll(-1f)
-            WHEEL_UP -> scroll(1f)
+            WHEEL_DOWN -> scroll(-1f, 0f)
+            WHEEL_UP -> scroll(1f, 0f)
+            // y +1 = 휠을 위로(내용 위로) = AXIS_VSCROLL +, x -1 = 오른쪽(제어측이 부호를 뒤집어 보낸다) = AXIS_HSCROLL +
+            WHEEL -> if (x != 0 || y != 0) scroll(y.sign.toFloat(), -x.sign.toFloat())
         }
     }
 
@@ -173,11 +179,12 @@ class PointerInjector {
         event.recycle()
     }
 
-    private fun scroll(v: Float) {
+    private fun scroll(v: Float, h: Float) {
         coords[0].clear()
         coords[0].x = mouseX.toFloat()
         coords[0].y = mouseY.toFloat()
         coords[0].setAxisValue(MotionEvent.AXIS_VSCROLL, v)
+        coords[0].setAxisValue(MotionEvent.AXIS_HSCROLL, h)
         val now = SystemClock.uptimeMillis()
         val event = MotionEvent.obtain(
             now, now, MotionEvent.ACTION_SCROLL, 1, mouseProps, coords,
