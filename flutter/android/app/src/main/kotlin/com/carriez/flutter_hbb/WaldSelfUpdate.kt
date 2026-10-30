@@ -255,5 +255,7 @@ class WaldUpdatedReceiver : BroadcastReceiver() {
         if (resume && !MainService.isReady) {
             BootReceiver().onReceive(context, Intent(DEBUG_BOOT_COMPLETED))
         }
+        // 새 버전에 든 도우미가 더 새 버전이면 함께 바꾼다(Android 12+ 창 없이 — 결정 D47 후속). 사람이 앱을 열지 않는 키오스크용.
+        WaldHelper.updateSilentlyIfNeeded(context)
     }
 }

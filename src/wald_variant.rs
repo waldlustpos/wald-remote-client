@@ -209,6 +209,7 @@ mod tests {
             (keys::OPTION_ENABLE_TUNNEL, "N"),
             (keys::OPTION_ENABLE_REMOTE_PRINTER, "N"),
             (keys::OPTION_ENABLE_CAMERA, "N"),
+            (keys::OPTION_ENABLE_FILE_TRANSFER, "Y"),
             (keys::OPTION_ACCESS_MODE, "custom"),
             ("allow-hide-cm", "N"),
         ] {

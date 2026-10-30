@@ -11,6 +11,7 @@
     "enable-tunnel": "N",
     "enable-remote-printer": "N",
     "enable-camera": "N",
+    "enable-file-transfer": "Y",
     "access-mode": "custom",
     "disable-change-permanent-password": "Y",
     "disable-change-id": "Y",

@@ -213,8 +213,9 @@ class ServerModel with ChangeNotifier {
 
     // file
     if (!await AndroidPermissionManager.check(kManageExternalStorage)) {
+      // Waldlust(DSK-02): 권한이 없다고 N 을 저장하지 않는다 — 저장하면 서비스 시작 때 권한을 허용해도 N 이 남아
+      // 토글이 꺼진 채 파일 전송이 거부됐다. 표시만 끈다.
       _fileOk = false;
-      bind.mainSetOption(key: kOptionEnableFileTransfer, value: "N");
     } else {
       final fileOption =
           await bind.mainGetOption(key: kOptionEnableFileTransfer);
@@ -330,6 +331,12 @@ class ServerModel with ChangeNotifier {
       }
     }
 
+    // Waldlust(DSK-02): 프리셋으로 고정된 값(수신 전용 enable-file-transfer=Y)은 바꾸지 않는다 — 권한만 받고 고정값을 보인다.
+    if (isOptionFixed(kOptionEnableFileTransfer)) {
+      _fileOk = await bind.mainGetOption(key: kOptionEnableFileTransfer) != 'N';
+      notifyListeners();
+      return;
+    }
     _fileOk = !_fileOk;
     bind.mainSetOption(
         key: kOptionEnableFileTransfer,
@@ -423,6 +430,7 @@ class ServerModel with ChangeNotifier {
       }
       if (!await AndroidPermissionManager.check(kManageExternalStorage)) {
         await AndroidPermissionManager.request(kManageExternalStorage);
+        await checkAndroidPermission(); // Waldlust(DSK-02): 방금 허용한 파일 전송을 토글에 바로 반영
       }
       final res = await parent.target?.dialogManager
           .show<bool>((setState, close, context) {

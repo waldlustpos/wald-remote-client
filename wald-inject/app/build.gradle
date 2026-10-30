@@ -7,6 +7,9 @@ plugins {
 // (InjectService — 플랫폼 서명 앱이라 아무 앱이나 쓰면 기기 입력 전체를 조작할 수 있다). build-android-local 스크립트가 같이 만든
 // 원격 앱 APK 의 서명에서 계산해 넘긴다(시험 빌드 = debug 키, 정식 = 릴리즈 키). 비어 있으면 아무도 받지 않는다.
 def callerCerts = (project.findProperty('waldCallerCerts') ?: '').toString().toLowerCase().replaceAll('[^0-9a-f,]', '')
+// 버전은 ../version.properties(원격 앱 버전과 따로 — 이 앱 코드가 바뀔 때만 올린다)
+def injectVersion = new Properties()
+rootProject.file('version.properties').withInputStream { injectVersion.load(it) }
 
 android {
     namespace 'co.kr.waldlust.remote.inject'
@@ -18,9 +21,8 @@ android {
         minSdk 22
         // 도우미와 같은 이유(targetSdk 33 이하는 Android 14 Play 프로텍트가 설치를 막는다)
         targetSdk 36
-        // 빌드 스크립트가 원격 앱과 같은 버전을 넘긴다. 이 폴더에서 바로 빌드하면 dev.
-        versionCode((project.findProperty('waldVersionCode') ?: '1').toString().toInteger())
-        versionName((project.findProperty('waldVersionName') ?: 'dev').toString())
+        versionCode(injectVersion['versionCode'].toString().toInteger())
+        versionName(injectVersion['versionName'].toString())
         buildConfigField 'String', 'CALLER_CERTS', "\"${callerCerts}\""
     }
 

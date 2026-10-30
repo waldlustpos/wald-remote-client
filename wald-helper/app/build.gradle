@@ -10,6 +10,11 @@ def keyPropsFile = rootProject.file('key.properties')
 if (keyPropsFile.exists()) {
     keyPropsFile.withInputStream { keyProps.load(it) }
 }
+def helperVersion = new Properties()
+def helperVersionFile = rootProject.file('version.properties')
+if (helperVersionFile.exists()) {
+    helperVersionFile.withInputStream { helperVersion.load(it) }
+}
 
 android {
     namespace 'co.kr.waldlust.remote.helper'
@@ -23,9 +28,10 @@ android {
         // Android 14 IM-H092W 2026-10-20). 36 은 경고 없이 설치됐다. 메인 앱 깨우기 액션은 메인 BootReceiver 의 intent-filter 에 있어
         // Android 16 의 명시적 인텐트 일치 규칙에도 맞는다.
         targetSdk 36
-        // 빌드 스크립트가 메인 앱과 같은 버전(정식은 태그에서 계산한 versionCode)을 넘긴다. 이 폴더에서 바로 빌드하면 dev.
-        versionCode((project.findProperty('waldVersionCode') ?: '1').toString().toInteger())
-        versionName((project.findProperty('waldVersionName') ?: 'dev').toString())
+        // 버전은 ../version.properties(원격 앱 버전과 따로 — 결정 D47 후속). 그 파일이 없는 옛 ref 는 빌드 스크립트가 넘기는
+        // 메인 앱 버전, 그것도 없으면 dev.
+        versionCode((helperVersion['versionCode'] ?: project.findProperty('waldVersionCode') ?: '1').toString().toInteger())
+        versionName((helperVersion['versionName'] ?: project.findProperty('waldVersionName') ?: 'dev').toString())
     }
 
     signingConfigs {
