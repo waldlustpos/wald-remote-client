@@ -10,6 +10,8 @@
 #        수신 전용이면 도우미 앱(wald-helper — 부록 A-44, 결정 D39·D40)도 같은 버전·같은 서명으로 먼저 만들어 메인 APK 의
 #        assets/wald-helper.apk 로 넣고(앱이 설치한다 — D40), 따로도 남긴다:
 #        dist 의 waldlust-remote-helper-<버전>-android[-<대상>].apk 와 manifest-android-helper.txt. wald-helper 가 없는 옛 ref 는 건너뛴다.
+#        수신 전용은 보드 플랫폼 키(WALD_PLATFORM_KEY, 기본 keys/platform-rk3568)가 있으면 입력 플러그인(wald-inject — 부록 A-69, 결정 D47)도
+#        만든다: dist 의 waldlust-remote-inject-<버전>-android[-<대상>].apk 와 manifest-android-inject.txt(메인 APK 에 넣지 않음 — 수동 설치).
 #        outgoing = 모바일(발신 전용 — 직원 개인 폰, DSK-12·결정 D43): WALDLUST_VARIANT=outgoing 을 Rust(conn-type outgoing 프리셋)와
 #        Gradle(targetSdk 34·BuildConfig.WALD_OUTGOING·src/waldOutgoing 매니페스트 — 피제어 권한·구성요소 없음)이 함께 읽는다.
 #        heartbeat 는 그대로 보낸다(폰 ID 확인용). 설치 파일 이름은 '-mobile'(D43 (5)), manifest 는 manifest-android-outgoing.txt.
@@ -207,6 +209,8 @@ HAPK=""
 if [ "$VARIANT" = incoming ] && [ -d wald-helper ]; then
   step helper
   HVCODE="${VCODE:-$(grep -E '^version:' flutter/pubspec.yaml | awk '{print $2}' | cut -d+ -f2)}"
+  # 도우미 버전은 wald-helper/version.properties(원격 앱 버전과 따로 — D47 후속). 없는 옛 ref 는 메인 앱 버전.
+  [ -f wald-helper/version.properties ] && HVCODE=$(grep -E '^versionCode=' wald-helper/version.properties | cut -d= -f2 | tr -d ' \r')
   echo "sdk.dir=$HOME/Library/Android/sdk" > wald-helper/local.properties
   [ "$TARGET" != release ] || cp "$KEYS/android-release.properties" wald-helper/key.properties || die "도우미 키 설정 복사"
   ( cd wald-helper && ./gradlew --no-daemon -q :app:assembleRelease -PwaldVersionCode="$HVCODE" -PwaldVersionName="$VER"
@@ -316,6 +320,45 @@ if [ -n "$HAPK" ]; then
   echo "done: $HAPK"
 fi
 
+# 4c) 수신 전용: 입력 플러그인(wald-inject — 부록 A-69, 결정 D47). 터치 패널 없는 보드에서는 Android 11+ 가 접근성 제스처를 취소하므로
+#     INJECT_EVENTS(signature)로 터치를 직접 넣는다 → 보드 플랫폼 키로 서명한다. 키 폴더는 WALD_PLATFORM_KEY(기본 keys/platform-rk3568,
+#     platform.pk8 + platform.x509.pem — 저장소·CI·로그에 넣지 않는다). 플러그인은 이 메인 앱 서명만 받도록 빌드 때 고정한다
+#     (-PwaldCallerCerts). 키 폴더가 없으면 건너뛴다. 메인 APK 에 넣지 않는다(1차 수동 설치 — D47). build-android-local.ps1 과 같은 단계.
+IAPK=""
+PLATFORM_KEY="${WALD_PLATFORM_KEY:-$KEYS/platform-rk3568}"
+if [ "$VARIANT" = incoming ] && [ -d wald-inject ]; then
+  if [ ! -f "$PLATFORM_KEY/platform.pk8" ] || [ ! -f "$PLATFORM_KEY/platform.x509.pem" ]; then
+    echo "inject plugin: skipped (no platform.pk8 / platform.x509.pem in $PLATFORM_KEY)"
+  else
+    step inject
+    echo "sdk.dir=$HOME/Library/Android/sdk" > wald-inject/local.properties
+    ( cd wald-inject && ./gradlew --no-daemon -q :app:assembleRelease -PwaldCallerCerts="$SIGNER"
+    ) > "$LOG/inject.log" 2>&1 || die "inject plugin"
+    IAPK="$OUT/waldlust-$VER-android-$KIND-inject.apk"
+    "$BT/zipalign" -f -p 4 wald-inject/app/build/outputs/apk/release/app-release-unsigned.apk "$IAPK.aligned" || die "inject plugin zipalign"
+    "$BT/apksigner" sign --key "$PLATFORM_KEY/platform.pk8" --cert "$PLATFORM_KEY/platform.x509.pem" --out "$IAPK" "$IAPK.aligned" \
+      >> "$LOG/inject.log" 2>&1; src=$?
+    rm -f "$IAPK.aligned"
+    [ $src -eq 0 ] || die "inject plugin signing (apksigner)"
+    IBADGING=$("$BT/aapt2" dump badging "$IAPK")
+    IPKG_LINE=$(echo "$IBADGING" | grep -E '^package:')
+    echo "inject $IPKG_LINE"
+    echo "$IPKG_LINE" | grep -q "name='co.kr.waldlust.remote.inject'" || die "플러그인 패키지가 co.kr.waldlust.remote.inject 가 아니다"
+    IVCODE=$(grep -E '^versionCode=' wald-inject/version.properties | cut -d= -f2 | tr -d ' \r')
+    echo "$IPKG_LINE" | grep -q "versionCode='$IVCODE'" || die "플러그인 versionCode 가 $IVCODE 가 아니다"
+    echo "$IBADGING" | grep -q "uses-permission: name='android.permission.INJECT_EVENTS'" || die "플러그인이 INJECT_EVENTS 를 요청하지 않는다"
+    ICERTS=$("$BT/apksigner" verify --print-certs "$IAPK")
+    ISIGNER=$(echo "$ICERTS" | grep -E "(Signer #1|V[0-9.]+ Signer:?) certificate SHA-256" | head -1 | awk '{print $NF}')
+    ISHA1=$(echo "$ICERTS" | grep -E "(Signer #1|V[0-9.]+ Signer:?) certificate SHA-1" | head -1 | awk '{print $NF}')
+    [ -n "$ISIGNER" ] || die "플러그인 서명을 읽지 못했다(apksigner)"
+    [ "$ISIGNER" != "$SIGNER" ] || die "플러그인이 플랫폼 키가 아니라 메인 앱 키로 서명됐다"
+    pin=$(python3 -c "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);print(sum(z.read(n).count(sys.argv[2].encode()) for n in z.namelist() if n.endswith('.dex')))" "$IAPK" "$SIGNER")
+    [ "${pin:-0}" -ge 1 ] || die "플러그인이 메인 앱 서명을 고정하지 않았다"
+    echo "inject plugin: platform cert SHA-1 ${ISHA1[1,5]}..., pins the main app signer"
+    echo "done: $IAPK"
+  fi
+fi
+
 # 5) dist/<버전>-<sha9>-<대상>/ 에 APK 와 manifest 를 모은다. 시험본은 이름에 대상을 붙인다(build-windows-local.ps1 -Inno 와 같은 규칙 — D36).
 step dist
 COMMIT=$(git rev-parse HEAD)
@@ -359,6 +402,25 @@ if [ -n "$HAPK" ]; then
     echo "built: $(date '+%Y-%m-%d %H:%M:%S')"
   } > "$DIST/manifest-android-helper.txt"
 fi
+if [ -n "$IAPK" ]; then
+  IDAPK="$DIST/waldlust-remote-inject-$VER-android$TSUF.apk"
+  cp "$IAPK" "$IDAPK" || die "dist 플러그인 복사"
+  {
+    echo "ref: $BASE ($COMMIT)"
+    echo "platform: android (no native code)"
+    echo "variant: inject"
+    echo "target: $TARGET"
+    echo "package: $(echo "$IPKG_LINE" | sed -E "s/.*name='([^']*)'.*versionCode='([^']*)'.*versionName='([^']*)'.*/\1 versionCode=\2 versionName=\3/")"
+    echo "signer sha256: $ISIGNER"
+    echo "signer sha1: $ISHA1"
+    echo "signing: platform key (${PLATFORM_KEY:t})"
+    echo "caller pin (main app signer sha256): $SIGNER"
+    echo "apk: ${IDAPK:t}"
+    echo "size: $(stat -f %z "$IDAPK")"
+    echo "sha256: $(shasum -a 256 "$IDAPK" | awk '{print $1}')"
+    echo "built: $(date '+%Y-%m-%d %H:%M:%S')"
+  } > "$DIST/manifest-android-inject.txt"
+fi
 # 6) release: 오픈소스 고지(D35)를 dist 에 둔다. APK 안의 Flutter NOTICES 와 vcpkg(arm-android — 마지막 ABI, 포트 구성은 두 ABI 가 같다).
 if [ "$TARGET" = release ]; then
   step notices
@@ -369,6 +431,7 @@ if [ "$TARGET" = release ]; then
 fi
 echo "dist: $DAPK"
 [ -n "$HAPK" ] && echo "dist: $HDAPK"
+[ -n "$IAPK" ] && echo "dist: $IDAPK"
 if [ "$TARGET" = release ]; then
   echo "주의: 앱 ID 가 co.kr.waldlust.remote 로 바뀌었다(D35) — 옛 앱(com.carriez.flutter_hbb)은 따로 지운다. 새 설치는 ID 가 새로 생긴다."
 else
